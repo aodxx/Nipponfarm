@@ -1,0 +1,229 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // [HELPERS]
+    function isSignedIn() { return request.auth != null; }
+    
+    function isAdmin() { 
+      return isSignedIn() && (
+        ('email' in request.auth.token && request.auth.token.email.lower() == 'panaod3826@gmail.com') || 
+        ('email' in request.auth.token && request.auth.token.email.lower() == 'pantipa3826@gmail.com') ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN')
+      ); 
+    }
+
+    function isActiveUser() {
+      return isSignedIn() && (
+        ('email' in request.auth.token && request.auth.token.email.lower() == 'panaod3826@gmail.com') || 
+        ('email' in request.auth.token && request.auth.token.email.lower() == 'pantipa3826@gmail.com') ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['ADMIN', 'STAFF'])
+      );
+    }
+    
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+
+    // [VALIDATION BOILERPLATE]
+    function isValidMaintenance(data) {
+      return data.keys().hasAll(['userId', 'title', 'location', 'status', 'urgency', 'createdAt']) &&
+             data.userId is string && data.title is string && data.title.size() <= 500 &&
+             data.location is string && data.status in ['PENDING', 'IN_PROGRESS', 'RESOLVED'] &&
+             data.urgency in ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] &&
+             data.createdAt is number;
+    }
+
+    function isValidFeedRecipe(data) {
+      return data.keys().hasAll(['userId', 'recipeName', 'ingredients', 'totalWeight', 'totalCost', 'createdAt']) &&
+             data.userId is string && data.recipeName is string && data.recipeName.size() <= 200 &&
+             data.ingredients is list && data.totalWeight is number && data.totalCost is number &&
+             data.createdAt is number;
+    }
+
+    function isValidNewsPost(data) {
+      return data.keys().hasAll(['userId', 'authorName', 'content', 'createdAt']) &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.authorName is string && data.authorName.size() <= 100 &&
+             data.content is string && data.content.size() <= 10000 &&
+             data.createdAt is number;
+    }
+
+    function isValidManual(data) {
+      return data.keys().hasAll(['title', 'content', 'updatedAt']) &&
+             data.title is string && data.title.size() <= 200 &&
+             data.content is string && data.content.size() <= 50000 &&
+             data.updatedAt is number;
+    }
+
+    function isValidBill(data) {
+      return data.keys().hasAll(['userId', 'billDate', 'vendorName', 'totalAmount', 'recordedBy', 'createdAt']) &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.billDate is string && data.billDate.size() <= 64 &&
+             data.vendorName is string && data.vendorName.size() <= 200 &&
+             data.totalAmount is number &&
+             data.recordedBy is string && data.recordedBy.size() <= 200 &&
+             (data.createdAt is number || data.createdAt is timestamp);
+    }
+
+    function isValidBillItem(data) {
+      return data.keys().hasAll(['userId', 'billId', 'description', 'quantity', 'total', 'date']) &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.billId is string && data.billId.size() <= 128 &&
+             data.description is string && data.description.size() <= 500 &&
+             data.quantity is number &&
+             data.total is number &&
+             data.date is string && data.date.size() <= 64;
+    }
+
+    function isValidPigPrice(data) {
+      return data.keys().hasAll(['userId', 'year', 'month', 'price', 'recordedBy', 'createdAt']) &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.year is number &&
+             data.month is number && data.month >= 1 && data.month <= 12 &&
+             data.price is number && data.price >= 0 &&
+             data.recordedBy is string && data.recordedBy.size() <= 200 &&
+             data.createdAt is number &&
+             (!('memo' in data) || (data.memo is string && data.memo.size() <= 1000));
+    }
+
+    function isValidHistoricalPigPrice(data) {
+      return data.keys().hasAll(['year', 'months', 'avg']) &&
+             data.keys().size() == 3 &&
+             data.year is number &&
+             data.avg is number &&
+             data.months is map;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Connection test
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // Users
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // News Posts
+    match /news_posts/{postId} {
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
+      
+      allow create: if isAdmin() && isValidNewsPost(incoming()) && incoming().userId == request.auth.uid;
+      
+      allow update: if (isAdmin() && isValidNewsPost(incoming())) || 
+                    (isSignedIn() && incoming().diff(existing()).affectedKeys().hasOnly(['likedBy']));
+      
+      allow delete: if isAdmin();
+    }
+
+    // Manuals (คลังความรู้)
+    match /manuals/{manualId} {
+      allow list, get: if isSignedIn();
+      allow create, update: if isAdmin() && isValidManual(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // Farm Core Data
+    match /sows/{documentId} { 
+      allow read, create, update: if isActiveUser(); 
+      allow delete: if isAdmin();
+    }
+    match /events/{documentId} { 
+      allow read, create, update: if isActiveUser(); 
+      allow delete: if isAdmin();
+    }
+    match /tasks/{documentId} { 
+      allow read, create, update: if isActiveUser(); 
+      allow delete: if isAdmin();
+    }
+    match /pig_sales/{documentId} { 
+      allow read, create, update: if isActiveUser(); 
+      allow delete: if isAdmin();
+    }
+    match /maintenance_requests/{documentId} { 
+      allow read: if isActiveUser();
+      allow create: if isActiveUser() && isValidMaintenance(incoming()) && incoming().userId == request.auth.uid;
+      allow update: if isActiveUser() && (isAdmin() || (isOwner(existing().userId) && isValidMaintenance(incoming())));
+      allow delete: if isAdmin();
+    }
+    
+    // Communications
+    match /chat_rooms/{documentId} { allow read, write: if isActiveUser(); }
+    match /chat_messages/{documentId} { allow read, write: if isActiveUser(); }
+    
+    // Payroll (Strictly Admin for most, but staff can read own and request advance)
+    match /employee_transactions/{documentId} { allow read, write: if isAdmin(); }
+    match /EmployeeTransaction/{documentId} { allow read, write: if isAdmin(); }
+    match /employee_salaries/{documentId} { 
+      allow read: if isAdmin() || (isSignedIn() && documentId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+    match /payroll_slips/{documentId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+    match /salary_advances/{documentId} {
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid && existing().status == 'PENDING');
+    }
+
+    // AI Bills & Scan
+    match /bills/{documentId} { 
+      allow read: if isActiveUser();
+      allow create: if isActiveUser() && isValidBill(incoming()) && incoming().userId == request.auth.uid;
+      allow update: if isActiveUser() && isValidBill(incoming()) && (incoming().userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+    match /bill_items/{documentId} { 
+      allow read: if isActiveUser();
+      allow create: if isActiveUser() && isValidBillItem(incoming()) && incoming().userId == request.auth.uid;
+      allow update: if isActiveUser() && isValidBillItem(incoming()) && (incoming().userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Tools
+    match /feed_recipes/{documentId} { 
+      allow read: if isActiveUser();
+      allow create, update: if isActiveUser() && isValidFeedRecipe(incoming());
+      allow delete: if isAdmin();
+    }
+    match /pig_prices/{documentId} {
+      allow read: if isActiveUser();
+      allow create: if isActiveUser() && isValidPigPrice(incoming()) && incoming().userId == request.auth.uid;
+      allow update: if isActiveUser() && isValidPigPrice(incoming()) && (incoming().userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+    match /historical_pig_prices/{documentId} {
+      allow read: if isSignedIn();
+      allow create: if isActiveUser() && isValidId(documentId) && isValidHistoricalPigPrice(incoming());
+      allow update: if isActiveUser() && isValidId(documentId) && (
+        isAdmin() ||
+        (isValidHistoricalPigPrice(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['year', 'months', 'avg']))
+      );
+      allow delete: if isAdmin() && isValidId(documentId);
+    }
+
+    // Farm Settings & Metadata
+    match /farm_settings/{documentId} {
+      allow read, write: if isActiveUser();
+    }
+
+    // Master Ingredients
+    match /master_ingredients/{documentId} {
+      allow read, write: if isActiveUser();
+    }
+  }
+}

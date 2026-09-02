@@ -1,0 +1,36 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    match /news/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn(); // In a real app, restrict to Admin, but for development we allow Staff
+    }
+
+    match /bills/{allPaths=**} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /maintenance/{allPaths=**} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /avatars/{userId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /profiles/{userId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
