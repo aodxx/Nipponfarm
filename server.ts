@@ -12,9 +12,9 @@ import { aiModels, createAiClient, getAiProviderName, isAiConfigured } from "./s
 
 dotenv.config();
 
-async function startServer() {
+export async function createApp(options: { serveFrontend?: boolean } = {}) {
+  const { serveFrontend = true } = options;
   const app = express();
-  const PORT = Number(process.env.PORT || 3000);
 
   app.use(express.json({ limit: "50mb" }));
 
@@ -789,6 +789,21 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
     }
   });
 
+  app.get("/api/cron/daily-tasks", async (req, res) => {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret || req.headers.authorization !== `Bearer ${cronSecret}`) {
+      return res.status(401).json({ success: false, error: "Unauthorized cron request" });
+    }
+
+    try {
+      const result = await triggerDailyTasksAlert();
+      return res.json({ success: true, result });
+    } catch (err: any) {
+      console.error("[Vercel Cron] Daily tasks alert failed:", err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // ---------------------------------------------------------
   // Cloudflare R2 Video Storage Endpoints
   // ---------------------------------------------------------
@@ -1091,13 +1106,13 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
     }
   });
 
-  if (process.env.NODE_ENV !== "production") {
+  if (serveFrontend && process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (serveFrontend) {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
@@ -1105,6 +1120,12 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
     });
   }
 
+  return app;
+}
+
+async function startServer() {
+  const app = await createApp();
+  const PORT = Number(process.env.PORT || 3000);
   const server = http.createServer(app);
   const wss = new WebSocketServer({ noServer: true });
 
