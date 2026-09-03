@@ -9,10 +9,11 @@
 ## อ่านตามลำดับ
 
 1. `PROJECT_STATUS.md`
-2. `docs/ARCHITECTURE.md`
-3. `docs/ENVIRONMENT_VARIABLES.md`
-4. `docs/VERIFICATION_CHECKLIST.md`
-5. `docs/MIGRATION_RUNBOOK.md`
+2. `docs/EXECUTION_PLAN.md`
+3. `docs/ARCHITECTURE.md`
+4. `docs/ENVIRONMENT_VARIABLES.md`
+5. `docs/VERIFICATION_CHECKLIST.md`
+6. `docs/MIGRATION_RUNBOOK.md`
 
 ## ระบบปัจจุบัน
 
