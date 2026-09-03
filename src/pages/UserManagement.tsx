@@ -5,6 +5,7 @@ import { subscribeToBaseSalaries, saveBaseSalary } from '../services/employeeSer
 import { UserProfile } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useBottomSheet } from '../contexts/BottomSheetContext';
+import { authenticatedFetch } from '../lib/authenticatedFetch';
 
 export default function UserManagement() {
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -97,7 +98,7 @@ export default function UserManagement() {
           await updateUserRole(user.uid, newRole);
           
           try {
-            await fetch('/api/send-welcome-email', {
+            await authenticatedFetch('/api/send-welcome-email', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -187,7 +188,7 @@ export default function UserManagement() {
               if (!testEmailAddress) return;
               setTestingEmail(true);
               try {
-                const response = await fetch('/api/test-email', {
+                const response = await authenticatedFetch('/api/test-email', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ email: testEmailAddress })

@@ -3,7 +3,14 @@ import path from "path";
 import { Type } from "@google/genai";
 import dotenv from "dotenv";
 import { aiModels, createAiClient, getAiProviderName, isAiConfigured } from "./server/aiProvider.js";
-import { requireFirebaseAuth, verifyFirebaseIdToken } from "./server/firebaseAuth.js";
+import {
+  requireActiveFirebaseAuth,
+  requireAdminFirebaseAuth,
+  requireBodyUserMatchesToken,
+  requireFirebaseAuth,
+  verifyFirebaseIdToken,
+} from "./server/firebaseAuth.js";
+import { isSafeContentType, isSafeImagePayload, isSafeR2Key } from "./server/authorizationPolicy.js";
 
 
 dotenv.config();
@@ -356,7 +363,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
     }
   });
 
-  app.post("/api/send-welcome-email", async (req, res) => {
+  app.post("/api/send-welcome-email", requireAdminFirebaseAuth, async (req, res) => {
     try {
       const { email, employeeName, salary, jobTitle } = req.body;
       if (!email || !employeeName) {
@@ -492,7 +499,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
     }
   });
 
-  app.post("/api/send-payslip-email", async (req, res) => {
+  app.post("/api/send-payslip-email", requireAdminFirebaseAuth, async (req, res) => {
     try {
       const {
         email,
@@ -698,7 +705,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
     }
   });
 
-  app.post("/api/test-email", async (req, res) => {
+  app.post("/api/test-email", requireAdminFirebaseAuth, async (req, res) => {
     try {
       const { email } = req.body;
       if (!email) {
@@ -766,7 +773,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
     }
   });
 
-  app.post("/api/trigger-daily-tasks-alert", async (req, res) => {
+  app.post("/api/trigger-daily-tasks-alert", requireAdminFirebaseAuth, async (req, res) => {
     try {
       console.log("[API Endpoint] Manual trigger of Daily Breeding Tasks Alert received.");
       const { triggerDailyTasksAlert } = await import("./server/dailyTasksAlert.js");
@@ -805,7 +812,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
   // ---------------------------------------------------------
   // Cloudflare R2 Video Storage Endpoints
   // ---------------------------------------------------------
-  app.post("/api/r2/presign-upload", async (req, res) => {
+  app.post("/api/r2/presign-upload", requireActiveFirebaseAuth, requireBodyUserMatchesToken, async (req, res) => {
     const { userId, contentType, key } = req.body;
     try {
       if (!userId) {
@@ -814,8 +821,14 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
       if (!contentType) {
         return res.status(400).json({ success: false, error: "กรุณาระบุ contentType ของไฟล์" });
       }
+      if (!isSafeContentType(contentType)) {
+        return res.status(400).json({ success: false, error: "ชนิดไฟล์วิดีโอไม่รองรับ" });
+      }
       if (!key) {
         return res.status(400).json({ success: false, error: "กรุณาระบุ key สำหรับเก็บไฟล์" });
+      }
+      if (!isSafeR2Key(key)) {
+        return res.status(400).json({ success: false, error: "รูปแบบ key ของไฟล์ไม่ถูกต้อง" });
       }
 
       const { getUploadPresignedUrl, verifyUserIsActive } = await import("./server/r2Service.js");
@@ -845,7 +858,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
     }
   });
 
-  app.post("/api/r2/presign-download", async (req, res) => {
+  app.post("/api/r2/presign-download", requireActiveFirebaseAuth, requireBodyUserMatchesToken, async (req, res) => {
     const { userId, key } = req.body;
     try {
       if (!userId) {
@@ -853,6 +866,9 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
       }
       if (!key) {
         return res.status(400).json({ success: false, error: "กรุณาระบุ key/URL ของไฟล์วิดีโอ" });
+      }
+      if (key.startsWith("http") && !key.includes("cloudflarestorage.com") && !key.includes("r2.dev")) {
+        return res.status(400).json({ success: false, error: "URL ของไฟล์วิดีโอไม่ถูกต้อง" });
       }
 
       const { getDownloadPresignedUrl, verifyUserIsActive, extractKeyFromUrl } = await import("./server/r2Service.js");
@@ -888,6 +904,9 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
         }
       }
 
+      if (!isSafeR2Key(r2Key)) {
+        return res.status(400).json({ success: false, error: "รูปแบบ key ของไฟล์ไม่ถูกต้อง" });
+      }
       const downloadUrl = await getDownloadPresignedUrl(r2Key);
       res.json({
         success: true,
@@ -1004,11 +1023,14 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
     }
   });
 
-  app.post("/api/upload-gateway", async (req, res) => {
+  app.post("/api/upload-gateway", requireActiveFirebaseAuth, async (req, res) => {
     try {
       const { image, path: destinationPath } = req.body;
       if (!image) {
         return res.status(400).json({ error: "Missing image data" });
+      }
+      if (typeof image !== "string" || !isSafeImagePayload(image)) {
+        return res.status(413).json({ error: "Image payload is invalid or too large" });
       }
 
       const fileName = destinationPath ? destinationPath.split("/").pop() : `img_${Date.now()}.webp`;

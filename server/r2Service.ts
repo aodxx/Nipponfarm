@@ -3,6 +3,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { getFirebaseRuntimeConfig } from "./firebaseConfig.js";
+import { isActiveProfile, isAdminProfile } from "./authorizationPolicy.js";
 
 const R2_ACCOUNT_ID = process.env.CLOUDFLARE_R2_ACCOUNT_ID;
 const R2_BUCKET_NAME = process.env.CLOUDFLARE_R2_BUCKET_NAME;
@@ -30,15 +31,22 @@ export async function verifyUserIsActive(userId: string): Promise<boolean> {
     const userData = userSnap.data();
     const email = (userData.email || "").toLowerCase();
     
-    // Super admin fallbacks
-    if (email === "panaod3826@gmail.com" || email === "pantipa3826@gmail.com") {
-      return true;
-    }
-    
-    // Check for active role (ADMIN or STAFF)
-    return userData.role === "ADMIN" || userData.role === "STAFF";
+    return isActiveProfile({ role: userData.role, email });
   } catch (error) {
     console.error("[R2Service] Error verifying user status:", error);
+    return false;
+  }
+}
+
+export async function verifyUserIsAdmin(userId: string): Promise<boolean> {
+  if (!userId) return false;
+  try {
+    const userSnap = await getDoc(doc(db, "users", userId));
+    if (!userSnap.exists()) return false;
+    const userData = userSnap.data();
+    return isAdminProfile({ role: userData.role, email: userData.email });
+  } catch (error) {
+    console.error("[R2Service] Error verifying admin status:", error);
     return false;
   }
 }
