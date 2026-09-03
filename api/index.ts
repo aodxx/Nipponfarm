@@ -1,13 +1,12 @@
 import type { Request, Response } from "express";
+import { createApp } from "../server.js";
 
 type ExpressApp = (req: Request, res: Response) => void;
 
 let appPromise: Promise<ExpressApp> | undefined;
 
 function getApp() {
-  appPromise ??= import("../server.ts").then(({ createApp }) =>
-    createApp({ serveFrontend: false }) as Promise<ExpressApp>,
-  );
+  appPromise ??= createApp({ serveFrontend: false }) as Promise<ExpressApp>;
   return appPromise;
 }
 
