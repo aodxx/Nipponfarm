@@ -1,5 +1,6 @@
 import { createVerify } from "node:crypto";
 import type { RequestHandler } from "express";
+import { isSameUser } from "./authorizationPolicy.js";
 
 const FIREBASE_CERTS_URL =
   "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com";
@@ -107,25 +108,78 @@ export async function verifyFirebaseIdToken(
   return payload;
 }
 
-export const requireFirebaseAuth: RequestHandler = async (req, res, next) => {
+async function authenticateRequest(
+  req: Parameters<RequestHandler>[0],
+  res: Parameters<RequestHandler>[1],
+): Promise<boolean> {
   const authorization = req.get("authorization") || "";
   const match = authorization.match(/^Bearer\s+(.+)$/i);
   if (!match) {
-    return res.status(401).json({ error: "Authentication required" });
+    res.status(401).json({ error: "Authentication required" });
+    return false;
   }
 
   const projectId = process.env.VITE_FIREBASE_PROJECT_ID?.trim();
   if (!projectId) {
     console.error("[FirebaseAuth] VITE_FIREBASE_PROJECT_ID is not configured");
-    return res.status(503).json({ error: "Authentication service is not configured" });
+    res.status(503).json({ error: "Authentication service is not configured" });
+    return false;
   }
 
   try {
     const token = await verifyFirebaseIdToken(match[1], projectId);
     res.locals.firebaseUser = { uid: token.sub, email: token.email };
-    return next();
+    return true;
   } catch (error) {
     console.warn("[FirebaseAuth] Token verification failed:", (error as Error).message);
-    return res.status(401).json({ error: "Invalid or expired authentication token" });
+    res.status(401).json({ error: "Invalid or expired authentication token" });
+    return false;
   }
+}
+
+export const requireFirebaseAuth: RequestHandler = async (req, res, next) => {
+  if (await authenticateRequest(req, res)) return next();
+};
+
+async function requireRole(
+  req: Parameters<RequestHandler>[0],
+  res: Parameters<RequestHandler>[1],
+  next: Parameters<RequestHandler>[2],
+  role: "active" | "admin",
+) {
+  if (!(await authenticateRequest(req, res))) return;
+
+  try {
+    const { verifyUserIsActive, verifyUserIsAdmin } = await import("./r2Service.js");
+    const uid = res.locals.firebaseUser?.uid as string | undefined;
+    const authorized = role === "admin"
+      ? await verifyUserIsAdmin(uid || "")
+      : await verifyUserIsActive(uid || "");
+
+    if (!authorized) {
+      return res.status(403).json({ error: "Insufficient permissions" });
+    }
+
+    return next();
+  } catch (error) {
+    console.error("[FirebaseAuth] Role verification failed:", (error as Error).message);
+    return res.status(503).json({ error: "Authorization service is not available" });
+  }
+}
+
+export const requireActiveFirebaseAuth: RequestHandler = (req, res, next) =>
+  requireRole(req, res, next, "active");
+
+export const requireAdminFirebaseAuth: RequestHandler = (req, res, next) =>
+  requireRole(req, res, next, "admin");
+
+export const requireBodyUserMatchesToken: RequestHandler = (req, res, next) => {
+  const authenticatedUid = res.locals.firebaseUser?.uid as string | undefined;
+  const requestedUid = typeof req.body?.userId === "string" ? req.body.userId : undefined;
+
+  if (!isSameUser(requestedUid, authenticatedUid)) {
+    return res.status(403).json({ error: "User identity does not match authentication token" });
+  }
+
+  return next();
 };

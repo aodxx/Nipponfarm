@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Camera, StopCircle, Upload, CheckCircle2, AlertTriangle, Loader2, RefreshCw, Film, Trash2, Video } from "lucide-react";
+import { authenticatedFetch } from "../lib/authenticatedFetch";
 
 interface VideoRecorderUploadProps {
   userId: string;
@@ -228,7 +229,7 @@ export const VideoRecorderUpload: React.FC<VideoRecorderUploadProps> = ({
       const contentType = selectedFile ? selectedFile.type : (recordedBlob?.type || "video/webm");
       const r2Key = `videos/${moduleName}/${draftId}.${ext}`;
 
-      const presignResponse = await fetch("/api/r2/presign-upload", {
+      const presignResponse = await authenticatedFetch("/api/r2/presign-upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -12,6 +12,7 @@ import jsPDF from 'jspdf';
 import { toPng } from 'html-to-image';
 
 import { useAuth } from '../../contexts/AuthContext';
+import { authenticatedFetch } from '../../lib/authenticatedFetch';
 
 const compressImage = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -428,7 +429,7 @@ export default function PayrollSummary() {
     setSendingEmailId(data.uid);
     try {
       const monthText = selectedMonth.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
-      const response = await fetch('/api/send-payslip-email', {
+      const response = await authenticatedFetch('/api/send-payslip-email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1123,4 +1124,3 @@ export default function PayrollSummary() {
     </div>
   );
 }
-

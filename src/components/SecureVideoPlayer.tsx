@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Play, AlertCircle, Loader2 } from "lucide-react";
+import { authenticatedFetch } from "../lib/authenticatedFetch";
 
 interface SecureVideoPlayerProps {
   videoUrl: string | null | undefined;
@@ -28,7 +29,7 @@ export const SecureVideoPlayer: React.FC<SecureVideoPlayerProps> = ({
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch("/api/r2/presign-download", {
+        const response = await authenticatedFetch("/api/r2/presign-download", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"

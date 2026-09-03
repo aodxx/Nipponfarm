@@ -9,6 +9,7 @@
 
 import { auth, storage } from '../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { authenticatedFetch } from '../lib/authenticatedFetch';
 
 export interface OptimizationOptions {
   type: 'document' | 'signature' | 'profile' | 'general';
@@ -191,7 +192,7 @@ export async function uploadOptimizedImage(
 
   try {
     // 1. Try uploading to ImageKit gateway via server proxy endpoint
-    const response = await fetch('/api/upload-gateway', {
+    const response = await authenticatedFetch('/api/upload-gateway', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
