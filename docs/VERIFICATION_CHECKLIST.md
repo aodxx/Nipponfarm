@@ -8,7 +8,7 @@
 - [x] Production domain เปิดได้
 - [x] Login สำเร็จ
 - [x] อ่านข้อมูลเดิมได้
-- [ ] `/api/health` ตอบ HTTP 200 และ `status: ok`
+- [x] `/api/health` ตอบ HTTP 200 และ `status: ok`
 - [ ] ตรวจ production build logs ไม่มี error
 - [ ] ตรวจ runtime error logs หลังทดสอบ
 
@@ -47,6 +47,6 @@
 | Browser render | PASS | ผู้ใช้ยืนยันหน้า production เปิดได้ |
 | Browser → Firebase Auth | PASS | Login สำเร็จหลังเพิ่ม Authorized Domain |
 | Firebase → UI | PASS (read only) | ผู้ใช้ยืนยันข้อมูลเดิมแสดง |
-| Browser → HTTP API | NOT RUN | ยังไม่มี production response/log |
+| Browser → HTTP API | PASS | ผู้ใช้เปิด production `/api/health` และได้รับ `{\"status\":\"ok\",\"aiProvider\":\"gemini\",\"aiReady\":false}` เมื่อ 2026-09-03 |
 | HTTP API → external services | NOT RUN | Secrets และ logs ยังไม่ยืนยัน |
 | Live WebSocket | BLOCKED | handler ปัจจุบันไม่ได้ export ผ่าน `api/index.ts` |
