@@ -9,7 +9,7 @@
 - [x] Login สำเร็จ
 - [x] อ่านข้อมูลเดิมได้
 - [x] `/api/health` ตอบ HTTP 200 และ `status: ok`
-- [ ] ตรวจ production build logs ไม่มี error
+- [x] GitHub Actions และ Vercel deployment status ผ่าน
 - [ ] ตรวจ runtime error logs หลังทดสอบ
 
 ## B. Core data flow
@@ -47,6 +47,7 @@
 | Browser render | PASS | ผู้ใช้ยืนยันหน้า production เปิดได้ |
 | Browser → Firebase Auth | PASS | Login สำเร็จหลังเพิ่ม Authorized Domain |
 | Firebase → UI | PASS (read only) | ผู้ใช้ยืนยันข้อมูลเดิมแสดง |
-| Browser → HTTP API | PASS | ผู้ใช้เปิด production `/api/health` และได้รับ `{\"status\":\"ok\",\"aiProvider\":\"gemini\",\"aiReady\":false}` เมื่อ 2026-09-03 |
+| Browser → HTTP API | PASS | หน้าเว็บและ `/api/health` ตอบ HTTP 200 จาก production |
+| Unauthenticated → AI APIs | PASS | Receipt, TTS และ Swine AI ตอบ HTTP 401 ทั้งหมด |
 | HTTP API → external services | NOT RUN | Secrets และ logs ยังไม่ยืนยัน |
 | Live WebSocket | BLOCKED | handler ปัจจุบันไม่ได้ export ผ่าน `api/index.ts` |
