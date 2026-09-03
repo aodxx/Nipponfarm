@@ -1,13 +1,31 @@
-import { createApp } from "../server";
+import type { Request, Response } from "express";
 
-let appPromise: ReturnType<typeof createApp> | undefined;
+type ExpressApp = (req: Request, res: Response) => void;
+
+let appPromise: Promise<ExpressApp> | undefined;
 
 function getApp() {
-  appPromise ??= createApp({ serveFrontend: false });
+  appPromise ??= import("../server").then(({ createApp }) =>
+    createApp({ serveFrontend: false }) as Promise<ExpressApp>,
+  );
   return appPromise;
 }
 
-export default async function handler(req: Parameters<Awaited<ReturnType<typeof createApp>>>[0], res: Parameters<Awaited<ReturnType<typeof createApp>>>[1]) {
-  const app = await getApp();
-  return app(req, res);
+export default async function handler(req: Request, res: Response) {
+  try {
+    const app = await getApp();
+    return app(req, res);
+  } catch (error) {
+    console.error("[Serverless Init Error]", error);
+    appPromise = undefined;
+
+    if (!res.headersSent) {
+      return res.status(500).json({
+        error: "SERVER_INIT_FAILED",
+        message: "เซิร์ฟเวอร์เริ่มทำงานไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+      });
+    }
+
+    res.end();
+  }
 }
