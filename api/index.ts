@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { createApp } from "../server.js";
+import { createApp } from "../appServer.js";
 
 type ExpressApp = (req: Request, res: Response) => void;
 
@@ -18,17 +18,10 @@ export default async function handler(req: Request, res: Response) {
     console.error("[Serverless Init Error]", error);
     appPromise = undefined;
 
-    const diagnostic = error instanceof Error
-      ? `${error.name}: ${error.message}`
-          .replaceAll(process.cwd(), "<app>")
-          .slice(0, 240)
-      : "Unknown initialization error";
-
     if (!res.headersSent) {
       return res.status(500).json({
         error: "SERVER_INIT_FAILED",
         message: "เซิร์ฟเวอร์เริ่มทำงานไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
-        diagnostic,
       });
     }
 
