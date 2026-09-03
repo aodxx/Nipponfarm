@@ -10,11 +10,14 @@
 | ถอน R2 credentials ที่เคยฝังในซอร์ส | เสร็จแล้ว; ต้อง revoke ชุดเดิม |
 | ถอน Firebase config/key ออกจาก Git history ปัจจุบัน | เสร็จใน working tree; ต้อง rotate/restrict key เดิม |
 | ทำ runtime config ผ่าน environment variables | เสร็จแล้ว |
-| เพิ่ม Docker/Render/GitHub Actions | เสร็จแล้ว |
+| เพิ่ม Vercel Functions/Cron/GitHub Actions | เสร็จแล้ว |
 | สร้าง Firebase project ใหม่ที่ผู้ใช้เป็นเจ้าของ | ต้องทำในบัญชีผู้ใช้ |
 | สำรองและย้ายข้อมูล Firestore/Storage/Auth | ต้องทำหลังยืนยันสิทธิ์โครงการเดิม |
-| สร้าง Render service และใส่ secrets | ต้องทำในบัญชีผู้ใช้ |
-| Smoke test ด้วยข้อมูลสำเนา | ต้องทำก่อนสลับ URL |
+| สร้าง Vercel project จาก GitHub | เสร็จแล้ว |
+| ตั้ง Firebase public config และ Authorized Domain | เสร็จแล้ว |
+| Login และอ่านข้อมูลเดิมบน Vercel | ผู้ใช้ยืนยันว่าผ่าน |
+| ตั้ง server-only secrets | ยังไม่เสร็จ |
+| Smoke test API/AI/Email/R2/Cron/WebSocket | ยังไม่เสร็จ |
 
 ## 1. จัดการ key ที่เคยเผยแพร่
 
@@ -33,9 +36,9 @@
 2. เปิด Authentication > Sign-in method > Google
 3. สร้าง Firestore database โดยเลือก region ใกล้ผู้ใช้และจดชื่อ database หากไม่ใช่ `(default)`
 4. เปิด Storage
-5. เพิ่ม Web App แล้วนำค่าจาก Firebase SDK config ไปใส่ตัวแปร `VITE_FIREBASE_*` ใน Render
+5. เพิ่ม Web App แล้วนำค่าจาก Firebase SDK config ไปใส่ตัวแปร `VITE_FIREBASE_*` ใน Vercel
 6. Deploy `firestore.rules` และ `storage.rules` หลังตรวจอีเมลผู้ดูแลใน rules
-7. เพิ่มโดเมน Render ใน Authentication > Settings > Authorized domains
+7. เพิ่มโดเมน Vercel ใน Authentication > Settings > Authorized domains
 
 ## 3. สำรองข้อมูลก่อนย้าย
 
@@ -51,14 +54,15 @@
 
 ห้ามลบ project เดิมจนกว่าจำนวน records, files และผู้ใช้จะตรงกัน และผู้ใช้จริงผ่านการทดสอบ
 
-## 4. Deploy Render
+## 4. Deploy Vercel
 
-1. เชื่อม GitHub repository `aodxx/Nipponfarm`
-2. สร้าง Blueprint จาก `render.yaml`
+1. Import GitHub repository `aodxx/Nipponfarm` เข้า Vercel project `nipponfarm`
+2. ใช้ preset Vite และ root directory `./`
 3. ใส่ environment variables ตาม `.env.example`
-4. ตั้ง `APP_URL` เป็น URL ที่ Render ออกให้
+4. ตั้ง `APP_URL=https://nipponfarm.vercel.app`
 5. Deploy แล้วเปิด `/api/health`; ต้องได้ `status: ok`
-6. เพิ่ม URL นั้นใน Firebase Authorized domains
+6. เพิ่ม `nipponfarm.vercel.app` ใน Firebase Authorized domains
+7. ยืนยันว่า production deployment ชี้ไปที่ `main`
 
 ## 5. Smoke test ก่อนสลับระบบ
 

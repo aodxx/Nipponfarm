@@ -7,7 +7,8 @@
 | ส่วน | สถานที่ใหม่ | เหตุผล |
 | --- | --- | --- |
 | Source control และ CI | GitHub | เป็นกลาง ตรวจสอบย้อนหลังได้ และไม่ผูกกับ IDE |
-| Web + API + WebSocket | Render Web Service (Docker) | รัน Node/Express เดิมได้โดยไม่ต้องเขียนแอปใหม่ |
+| Web + HTTP API | Vercel (Vite + Vercel Functions) | เชื่อม GitHub และ deploy `main` อัตโนมัติ |
+| Live AI transport | ยังต้องออกแบบใหม่ | `/live` แบบ Node server เดิมยังไม่ถูกผูกเข้ากับ Vercel Function |
 | Authentication + Database | Firebase project ที่ผู้ใช้เป็นเจ้าของ | ลดความเสี่ยงในการย้ายข้อมูลและไม่ต้องแก้ service layer ทั้งระบบทันที |
 | รูปภาพ | Firebase Storage เป็นค่าเริ่มต้น; ImageKit เป็นตัวเลือก | โค้ดเดิมรองรับอยู่แล้ว |
 | วิดีโอ | Cloudflare R2 | มีระบบ presigned URL เดิมและแยก credential ออกจากซอร์สแล้ว |
@@ -20,13 +21,13 @@ Firebase เป็นบริการแยกจาก AI Studio แม้อ
 
 ```mermaid
 flowchart TD
-  U["ผู้ใช้ PWA"] --> R["Render: React + Express"]
+  U["ผู้ใช้ PWA"] --> R["Vercel: React + Functions"]
   U --> F["Firebase Auth / Firestore / Storage"]
   R --> A["AI provider adapter"]
   R --> V["Cloudflare R2"]
   R --> M["SMTP"]
   G["GitHub main"] --> C["GitHub Actions"]
-  C --> R
+  G --> R
 ```
 
 ## ของเดิมที่ผูกกับ AI Studio และถูกถอดออกแล้ว
@@ -35,15 +36,16 @@ flowchart TD
 - ไม่มี Firebase API key ฝังอยู่ใน repository
 - ไม่มี URL ของ AI Studio/Cloud Run เดิมเป็นค่า fallback
 - ไม่มี `User-Agent: aistudio-build`
-- Server ใช้ `PORT` จากระบบ hosting
+- Express routes ถูก export ผ่าน `api/index.ts` เป็น Vercel Function
+- Cron เวลา 05:00 Asia/Bangkok ถูกกำหนดเป็น `0 22 * * *` UTC ใน `vercel.json`
 - Secrets และ public runtime config กำหนดผ่าน environment variables
-- มี Dockerfile และ Render Blueprint สำหรับ deploy จาก GitHub
+- มี `vercel.json`, Vercel Function entrypoint และ GitHub Actions สำหรับ deploy/verify จาก GitHub
 - มี GitHub Actions ตรวจ TypeScript และ production build ทุกครั้งที่ push
 
 ## ข้อจำกัดที่ต้องรู้
 
-- Render Free จะพักบริการเมื่อไม่มีการใช้งาน งาน `node-cron` เวลา 05:00 และ WebSocket จึงไม่เหมาะกับ production บน Free plan
-- ช่วงทดลองใช้ Free plan ได้ แต่เมื่อใช้แจ้งเตือนประจำวันจริงต้องใช้ instance ที่ทำงานตลอดเวลา หรือแยก cron เป็น scheduled service
+- Vercel Cron จะเรียก `/api/cron/daily-tasks` ได้ต่อเมื่อกำหนด `CRON_SECRET`
+- WebSocket `/live` ใน `server.ts` ถูกสร้างเมื่อรัน Node server แบบเดิม แต่ `api/index.ts` export เฉพาะ Express app ดังนั้น Live AI ยังไม่ถือว่ารองรับบน deployment ปัจจุบัน
 - การเปลี่ยน Firestore เป็น Supabase/Postgres ตอนนี้มีความเสี่ยงสูง เพราะ frontend เรียก Firestore โดยตรงหลายโมดูล ควรทำหลังระบบใหม่ออนไลน์และสำรองข้อมูลแล้ว
 - Gemini ยังเป็น provider ที่ implement อยู่ในปัจจุบัน แต่การตั้งค่าอยู่ฝั่ง server และมีจุดรวม provider/model สำหรับเพิ่ม provider อื่นภายหลัง
 
