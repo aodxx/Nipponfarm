@@ -2,8 +2,8 @@ import express from "express";
 import path from "path";
 import { Type } from "@google/genai";
 import dotenv from "dotenv";
-import { aiModels, createAiClient, getAiProviderName, isAiConfigured } from "./server/aiProvider";
-import { requireFirebaseAuth, verifyFirebaseIdToken } from "./server/firebaseAuth";
+import { aiModels, createAiClient, getAiProviderName, isAiConfigured } from "./server/aiProvider.js";
+import { requireFirebaseAuth, verifyFirebaseIdToken } from "./server/firebaseAuth.js";
 
 
 dotenv.config();
@@ -769,7 +769,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
   app.post("/api/trigger-daily-tasks-alert", async (req, res) => {
     try {
       console.log("[API Endpoint] Manual trigger of Daily Breeding Tasks Alert received.");
-      const { triggerDailyTasksAlert } = await import("./server/dailyTasksAlert");
+      const { triggerDailyTasksAlert } = await import("./server/dailyTasksAlert.js");
       const result = await triggerDailyTasksAlert();
       res.json({
         success: true,
@@ -793,7 +793,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
     }
 
     try {
-      const { triggerDailyTasksAlert } = await import("./server/dailyTasksAlert");
+      const { triggerDailyTasksAlert } = await import("./server/dailyTasksAlert.js");
       const result = await triggerDailyTasksAlert();
       return res.json({ success: true, result });
     } catch (err: any) {
@@ -818,7 +818,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
         return res.status(400).json({ success: false, error: "กรุณาระบุ key สำหรับเก็บไฟล์" });
       }
 
-      const { getUploadPresignedUrl, verifyUserIsActive } = await import("./server/r2Service");
+      const { getUploadPresignedUrl, verifyUserIsActive } = await import("./server/r2Service.js");
 
       // Check role permissions (must be ACTIVE ADMIN or STAFF)
       const isAuthorized = await verifyUserIsActive(userId);
@@ -855,7 +855,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
         return res.status(400).json({ success: false, error: "กรุณาระบุ key/URL ของไฟล์วิดีโอ" });
       }
 
-      const { getDownloadPresignedUrl, verifyUserIsActive, extractKeyFromUrl } = await import("./server/r2Service");
+      const { getDownloadPresignedUrl, verifyUserIsActive, extractKeyFromUrl } = await import("./server/r2Service.js");
 
       // Check role permissions (must be ACTIVE ADMIN or STAFF)
       const isAuthorized = await verifyUserIsActive(userId);
@@ -1124,7 +1124,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
 export async function startStandaloneServer() {
   const http = await import("node:http");
   const { WebSocketServer } = await import("ws");
-  const { initDailyTasksCron } = await import("./server/dailyTasksAlert");
+  const { initDailyTasksCron } = await import("./server/dailyTasksAlert.js");
   const app = await createApp();
   const PORT = Number(process.env.PORT || 3000);
   const server = http.createServer(app);

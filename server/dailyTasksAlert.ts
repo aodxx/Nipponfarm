@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, query, where, getDocs, doc, setDoc, addDoc, updateDoc } from "firebase/firestore";
 import cron from "node-cron";
-import { getFirebaseRuntimeConfig } from "./firebaseConfig";
+import { getFirebaseRuntimeConfig } from "./firebaseConfig.js";
 
 const firebaseConfig = getFirebaseRuntimeConfig();
 

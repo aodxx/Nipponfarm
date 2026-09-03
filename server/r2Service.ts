@@ -2,7 +2,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { getFirebaseRuntimeConfig } from "./firebaseConfig";
+import { getFirebaseRuntimeConfig } from "./firebaseConfig.js";
 
 const R2_ACCOUNT_ID = process.env.CLOUDFLARE_R2_ACCOUNT_ID;
 const R2_BUCKET_NAME = process.env.CLOUDFLARE_R2_BUCKET_NAME;

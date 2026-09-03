@@ -1,6 +1,6 @@
 import { initializeApp, getApp, getApps } from "firebase/app";
 import { getFirestore, collection, query, where, getDocs, doc, getDoc, setDoc, addDoc, updateDoc } from "firebase/firestore";
-import { getFirebaseRuntimeConfig } from "./firebaseConfig";
+import { getFirebaseRuntimeConfig } from "./firebaseConfig.js";
 
 const firebaseConfig = getFirebaseRuntimeConfig();
 
