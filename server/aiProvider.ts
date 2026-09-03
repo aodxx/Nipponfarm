@@ -2,6 +2,12 @@ import "dotenv/config";
 import { GoogleGenAI } from "@google/genai";
 
 export type AiProviderName = "gemini";
+export type AiReadinessCode = "AI_NOT_CONFIGURED" | "AI_PROVIDER_UNSUPPORTED";
+
+export type AiReadiness = {
+  ready: boolean;
+  code?: AiReadinessCode;
+};
 
 export function getAiProviderName(): AiProviderName {
   const provider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
@@ -11,8 +17,20 @@ export function getAiProviderName(): AiProviderName {
   return provider;
 }
 
+export function getAiReadiness(): AiReadiness {
+  try {
+    getAiProviderName();
+  } catch {
+    return { ready: false, code: "AI_PROVIDER_UNSUPPORTED" };
+  }
+
+  return process.env.GEMINI_API_KEY || process.env.CENTRAL_GEMINI_API_KEY
+    ? { ready: true }
+    : { ready: false, code: "AI_NOT_CONFIGURED" };
+}
+
 export function isAiConfigured(): boolean {
-  return Boolean(process.env.GEMINI_API_KEY || process.env.CENTRAL_GEMINI_API_KEY);
+  return getAiReadiness().ready;
 }
 
 export function createAiClient(): GoogleGenAI {
