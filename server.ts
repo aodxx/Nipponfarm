@@ -1125,7 +1125,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
   return app;
 }
 
-async function startServer() {
+export async function startStandaloneServer() {
   const http = await import("node:http");
   const { WebSocketServer } = await import("ws");
   const { initDailyTasksCron } = await import("./server/dailyTasksAlert");
@@ -1204,13 +1204,5 @@ async function startServer() {
     console.log(`Server running on http://localhost:${PORT}`);
     // Register the automated morning task email dispatcher at 05:00 AM Bangkok Time
     initDailyTasksCron();
-  });
-}
-
-// Vercel imports createApp() from api/index.ts and owns the HTTP listener.
-// Starting a second listener during module initialization crashes the function.
-if (!process.env.VERCEL) {
-  startServer().catch(err => {
-    console.error("CRITICAL: Server failed to start:", err);
   });
 }
