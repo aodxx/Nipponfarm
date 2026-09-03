@@ -3,25 +3,26 @@ import path from "path";
 import http from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI, Type } from "@google/genai";
+import { Type } from "@google/genai";
 import dotenv from "dotenv";
 import { initDailyTasksCron, triggerDailyTasksAlert } from "./server/dailyTasksAlert";
 import { getUploadPresignedUrl, getDownloadPresignedUrl, verifyUserIsActive, extractKeyFromUrl } from "./server/r2Service";
+import { aiModels, createAiClient, getAiProviderName, isAiConfigured } from "./server/aiProvider";
 
 
 dotenv.config();
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT || 3000);
 
   app.use(express.json({ limit: "50mb" }));
 
   app.get("/api/health", (req, res) => {
-    const apiKey = process.env.CENTRAL_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
     res.json({ 
       status: "ok",
-      aiKeyReady: !!apiKey
+      aiProvider: getAiProviderName(),
+      aiReady: isAiConfigured()
     });
   });
 
@@ -116,14 +117,7 @@ async function startServer() {
         return res.status(500).json({ error: "เซิร์ฟเวอร์ยังไม่ได้ตั้งค่า API Key (โปรดตั้งค่า CENTRAL_GEMINI_API_KEY ใน Settings > Secrets)" });
       }
 
-      const ai = new GoogleGenAI({ 
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          }
-        }
-      });
+      const ai = createAiClient();
 
       // Strip potential data URL prefix from base64 string
       const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
@@ -211,7 +205,13 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
       };
 
       // Robust fallback list of models with automated retries
-      const candidateModels = ["gemini-2.5-flash", "gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-flash-latest"];
+      const candidateModels = Array.from(new Set([
+        aiModels.vision,
+        "gemini-2.5-flash",
+        "gemini-3.1-flash-lite",
+        "gemini-3.5-flash",
+        "gemini-flash-latest"
+      ]));
       let lastError: any = null;
       let finalResponse: any = null;
       let successfullyUsedModel = "";
@@ -308,7 +308,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
       const errorStr = String(error?.message || error);
       
       if (errorStr.includes("429") || errorStr.includes("RESOURCE_EXHAUSTED") || errorStr.includes("depleted")) {
-        friendlyError = "API Key ที่ใช้งานหมดโควต้า/เครดิต (Quota Exceeded) โปรดเปลี่ยน API Key ใหม่ หรือเติมเงินใน Google AI Studio";
+        friendlyError = "API Key ที่ใช้งานหมดโควต้า/เครดิต (Quota Exceeded) โปรดตรวจสอบผู้ให้บริการ AI ที่ตั้งค่าไว้";
       } else if (errorStr.includes("API_KEY_INVALID")) {
         friendlyError = "API Key ไม่ถูกต้อง โปรดตรวจสอบ API Key ในช่อง Settings > Secrets อีกครั้ง";
       } else if (errorStr.includes("503") || errorStr.includes("UNAVAILABLE")) {
@@ -331,19 +331,12 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
         return res.status(500).json({ error: "Gemini API key is not configured" });
       }
 
-      const ai = new GoogleGenAI({ 
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          }
-        }
-      });
+      const ai = createAiClient();
 
       const voiceName = voice || 'Zephyr'; // Puck, Charon, Kore, Fenrir, Zephyr
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-tts-preview",
+        model: aiModels.speech,
         contents: [{ parts: [{ text: `Say naturally and clearly in Thai: ${text}` }] }],
         config: {
           responseModalities: ["AUDIO"],
@@ -436,7 +429,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
               </div>
 
               <div style="text-align: center;">
-                <a href="${process.env.APP_URL || 'https://ais-dev-5esx5yjiged7cyugyrxbml-724173468781.asia-southeast1.run.app'}" class="btn">เข้าใช้งานระบบนิพนธ์ฟาร์ม</a>
+                <a href="${process.env.APP_URL || 'http://localhost:3000'}" class="btn">เข้าใช้งานระบบนิพนธ์ฟาร์ม</a>
               </div>
             </div>
             <div class="footer">
@@ -906,10 +899,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
         throw new Error("API key missing");
       }
 
-      const ai = new GoogleGenAI({ 
-        apiKey,
-        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
-      });
+      const ai = createAiClient();
 
       const contents: any[] = [];
       const systemInstruction = `คุณคือ "หมอหมู AI" (Nipon Farm Swine Breeding Specialist) ผู้เชี่ยวชาญด้านการประเมินสัดและการสแกนตรวจท้องของแม่สุกร ให้คำวินิจฉัยสัตวแพทย์ที่ละเอียด ละมุนละไม เป็นมิตรแบบไทย และแม่นยำ`;
@@ -937,7 +927,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
       }
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: aiModels.vision,
         contents,
         config: {
           systemInstruction,
@@ -1148,11 +1138,11 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
             return;
           }
 
-          const ai = new GoogleGenAI({ apiKey });
+          const ai = createAiClient();
           try {
             const systemInstruction = `คุณคือ "หมอหมู AI" (Nipon Farm Swine Specialist) ผู้เชี่ยวชาญวิเคราะห์สรีระพฤติกรรมสุกร ตอบสั้นกระชับ สุภาพ ทันใจ ลงท้ายด้วยครับ`;
             const response = await ai.models.generateContent({
-              model: "gemini-2.5-flash",
+              model: aiModels.text,
               contents: [{ parts: [{ text: `ผู้เลี้ยงถามว่า: "${text}" เกี่ยวกับแม่หมูเบอร์ ${sowTag} ในการตรวจ ${streamMode}` }] }],
               config: { systemInstruction }
             });

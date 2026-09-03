@@ -1,12 +1,9 @@
-import fs from "fs";
-import path from "path";
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, query, where, getDocs, doc, setDoc, addDoc, updateDoc } from "firebase/firestore";
 import cron from "node-cron";
+import { getFirebaseRuntimeConfig } from "./firebaseConfig";
 
-// Read Firebase config from workspace root
-const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
+const firebaseConfig = getFirebaseRuntimeConfig();
 
 // Initialize private Firestore instance for backend background jobs
 const app = initializeApp(firebaseConfig, "DailyCronApp");

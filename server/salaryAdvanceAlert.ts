@@ -1,11 +1,8 @@
-import fs from "fs";
-import path from "path";
 import { initializeApp, getApp, getApps } from "firebase/app";
 import { getFirestore, collection, query, where, getDocs, doc, getDoc, setDoc, addDoc, updateDoc } from "firebase/firestore";
+import { getFirebaseRuntimeConfig } from "./firebaseConfig";
 
-// Read Firebase config from workspace root
-const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
+const firebaseConfig = getFirebaseRuntimeConfig();
 
 // Safe initialization of Firebase for server-side utilities
 const app = getApps().length === 0 ? initializeApp(firebaseConfig, "SalaryAdvanceApp") : getApps()[0];

@@ -176,7 +176,7 @@ export default function InstallPWA() {
             {/* Content body based on browser condition */}
             <div className="py-4 space-y-4">
               
-              {/* CASE 1: App is running inside AI Studio preview iframe */}
+              {/* CASE 1: App is running inside an embedded preview iframe */}
               {isIframe && (
                 <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-2xl p-4 text-xs space-y-2">
                   <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-bold text-sm">

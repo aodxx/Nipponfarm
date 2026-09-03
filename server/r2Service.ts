@@ -1,9 +1,8 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import fs from "fs";
-import path from "path";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { getFirebaseRuntimeConfig } from "./firebaseConfig";
 
 const R2_ACCOUNT_ID = process.env.CLOUDFLARE_R2_ACCOUNT_ID;
 const R2_BUCKET_NAME = process.env.CLOUDFLARE_R2_BUCKET_NAME;
@@ -12,9 +11,8 @@ const R2_SECRET_ACCESS_KEY = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY;
 const R2_ENDPOINT = process.env.CLOUDFLARE_R2_ENDPOINT ||
   (R2_ACCOUNT_ID ? `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : undefined);
 
-// Initialize Firestore for R2 operations
-const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
+// Initialize Firestore using deployment-neutral environment variables.
+const firebaseConfig = getFirebaseRuntimeConfig();
 const app = getApps().length === 0 ? initializeApp(firebaseConfig, "R2App") : getApps()[0];
 const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 

@@ -187,7 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (error.code === 'auth/popup-closed-by-user') {
-        showAlert("คุณปิดหน้าต่างล็อกอินของ Google Drive ก่อนจะอนุญาตสำเร็จ หากคุณรันแอปบนหน้าต่างเฟรม AI Studio กรุณากดปุ่ม 'เปิดในแท็บใหม่' ที่มุมขวาบนของพรีวิว และลองเซฟใหม่อีกครั้งครับ เพื่อเลี่ยงปัญหาเบราว์เซอร์บล็อกพอปอัป");
+        showAlert("คุณปิดหน้าต่างล็อกอินของ Google Drive ก่อนอนุญาตสำเร็จ หากเปิดแอปอยู่ในหน้าต่างฝังตัว กรุณาเปิดแอปในแท็บใหม่แล้วลองอีกครั้ง เพื่อเลี่ยงการบล็อกป๊อปอัปของเบราว์เซอร์");
       }
       throw error;
     }
@@ -274,4 +274,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </AuthContext.Provider>
   );
 };
-
