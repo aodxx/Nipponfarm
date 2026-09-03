@@ -3,6 +3,7 @@
   "name": "นิพนธ์ฟาร์ม (Nipon Farm)",
   "short_name": "นิพนธ์ฟาร์ม",
   "description": "ระบบบริหารจัดการฟาร์มสุกรอัจฉริยะ นิพนธ์ฟาร์ม",
+  "lang": "th",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -11,34 +12,22 @@
   "theme_color": "#f8fafc",
   "icons": [
     {
-      "src": "/pwa-192x192-v2.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/pwa-192x192-v2.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "/pwa-512x512-v2.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/pwa-512x512-v2.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
       "src": "/icon.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/pwa-192x192-v2.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/pwa-512x512-v2.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
