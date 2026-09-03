@@ -1,3 +1,5 @@
+import { authenticatedFetch } from '../lib/authenticatedFetch';
+
 export interface ReceiptItem {
   description: string;
   quantity: number;
@@ -23,7 +25,7 @@ export const analyzeReceipt = async (
   historicalVendors?: string[]
 ): Promise<ReceiptAnalysis> => {
   try {
-    const response = await fetch(`/api/receipt-analyze?t=${Date.now()}`, {
+    const response = await authenticatedFetch(`/api/receipt-analyze?t=${Date.now()}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

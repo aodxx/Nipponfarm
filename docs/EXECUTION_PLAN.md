@@ -152,6 +152,8 @@
 
 ### 4.1 Gemini AI
 
+- [x] บังคับ Firebase authentication สำหรับ Receipt AI, Swine AI, TTS และ Live AI WebSocket
+- [x] ลบการเรียก AI ซ้ำและผลวิเคราะห์จำลองเมื่อ provider ผิดพลาด
 - [ ] ตั้ง `AI_PROVIDER`, `GEMINI_API_KEY` และชื่อโมเดลฝั่ง server
 - [ ] ตรวจ health ว่า AI พร้อม โดยไม่แสดง key
 - [ ] ทดสอบ OCR ใบเสร็จหนึ่งภาพที่ไม่มีข้อมูลอ่อนไหว

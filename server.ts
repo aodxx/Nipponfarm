@@ -3,6 +3,7 @@ import path from "path";
 import { Type } from "@google/genai";
 import dotenv from "dotenv";
 import { aiModels, createAiClient, getAiProviderName, isAiConfigured } from "./server/aiProvider";
+import { requireFirebaseAuth, verifyFirebaseIdToken } from "./server/firebaseAuth";
 
 
 dotenv.config();
@@ -95,7 +96,7 @@ export async function createApp(options: { serveFrontend?: boolean } = {}) {
     }
   });
 
-  app.post("/api/receipt-analyze", async (req, res) => {
+  app.post("/api/receipt-analyze", requireFirebaseAuth, async (req, res) => {
     console.log("-> Starting receipt analysis handler with fallback and retries");
     try {
       const { image, historicalDescriptions, historicalVendors } = req.body;
@@ -314,7 +315,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
     }
   });
 
-  app.post("/api/text-to-speech", async (req, res) => {
+  app.post("/api/text-to-speech", requireFirebaseAuth, async (req, res) => {
     try {
       const { text, voice } = req.body;
       if (!text) {
@@ -906,7 +907,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
   // AI Swine Breeding Real-time Live Bridge & REST Endpoints
   // ---------------------------------------------------------
 
-  app.post("/api/swine-ai-analyze", async (req, res) => {
+  app.post("/api/swine-ai-analyze", requireFirebaseAuth, async (req, res) => {
     const { image, sowId, sowTag, mode, prompt, textQuery } = req.body;
     try {
       const apiKey = process.env.CENTRAL_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
@@ -992,18 +993,13 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
       });
 
     } catch (err: any) {
-      console.error("Swine AI Analyze Error, using high-fidelity fallback:", err);
-      res.json({
-        success: true,
-        text: mode === 'ESTRUS' 
-          ? `สวัสดีครับ จากการสแกนด้วยระบบ AI พบว่าอวัยวะเพศของแม่หมู #${sowTag} เริ่มมีอาการบวมแดงที่ระดับ 75% และสังเกตพฤติกรรมมีความกระวนกระวายเล็กน้อย ร่วมกับการกดแรงที่หลังสะโพกพบว่า มีอาการ Standing Reflex ในเกณฑ์ตอบรับที่ดีครับ แนะนำให้เตรียมอสุจิแช่แข็งเพื่อผสมเทียมภายใน 12-24 ชั่วโมงนี้ครับ`
-          : `สวัสดีครับ จากการตรวจสอบครรภ์สตรีมภาพสดและชุดข้อมูลของแม่หมู #${sowTag} พบความน่าจะเป็นในการติดลูกอยู่ที่ 85% คาดว่าตัวอ่อนในมดลูกสมบูรณ์แข็งแรงดี ยินดีด้วยครับ! แนะนำให้ปรับอาหารเป็นสูตรอุ้มท้องและเฝ้าระวังกรงขังให้สะอาดเรียบร้อยครับ`,
-        metrics: {
-          vulvaSwelling: mode === 'ESTRUS' ? 75 : 15,
-          pregnancyConfidence: mode === 'ESTRUS' ? 10 : 85,
-          standingReflex: mode === 'ESTRUS' ? 'STRONG' : 'NONE'
-        },
-        diagnosticResult: mode === 'ESTRUS' ? 'ESTRUS_ACTIVE' : 'PREGNANT'
+      console.error("Swine AI Analyze Error:", err);
+      const isMissingKey = String(err?.message || err).includes("API key missing");
+      res.status(isMissingKey ? 503 : 500).json({
+        success: false,
+        error: isMissingKey
+          ? "ระบบ AI ยังไม่ได้ตั้งค่า API key"
+          : "ระบบ AI ไม่สามารถวิเคราะห์ได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง",
       });
     }
   });
@@ -1136,6 +1132,7 @@ export async function startStandaloneServer() {
 
   wss.on("connection", (ws) => {
     console.log("[WS Connection] Client connected to Live AI scan");
+    let authenticated = false;
     let sowTag = "Unknown";
     let streamMode = "ESTRUS";
 
@@ -1144,6 +1141,21 @@ export async function startStandaloneServer() {
         const msg = JSON.parse(data.toString());
         
         if (msg.type === "start") {
+          const projectId = process.env.VITE_FIREBASE_PROJECT_ID?.trim();
+          if (!projectId || typeof msg.idToken !== "string") {
+            ws.close(1008, "Authentication required");
+            return;
+          }
+
+          try {
+            await verifyFirebaseIdToken(msg.idToken, projectId);
+            authenticated = true;
+          } catch (error) {
+            console.warn("[WS Auth] Token verification failed:", (error as Error).message);
+            ws.close(1008, "Invalid authentication token");
+            return;
+          }
+
           sowTag = msg.sowTag || "Unknown";
           streamMode = msg.mode || "ESTRUS";
           ws.send(JSON.stringify({ 
@@ -1152,6 +1164,11 @@ export async function startStandaloneServer() {
           }));
         } 
         else if (msg.type === "text_query") {
+          if (!authenticated) {
+            ws.close(1008, "Authentication required");
+            return;
+          }
+
           const text = msg.text;
           const apiKey = process.env.CENTRAL_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
           
@@ -1159,7 +1176,7 @@ export async function startStandaloneServer() {
             ws.send(JSON.stringify({ 
               type: "transcript", 
               source: "ai", 
-              text: `ขออภัยครับ ยังไม่ได้กำหนดค่า API Key แต่ตามรายงานของแม่หมู #${sowTag} เบื้องต้น ถือว่าอาการตอบรับดีมาก แนะนำให้กดปุ่มถ่ายภาพเพื่อรับความเห็นวินิจฉัยละเอียดและบันทึกประวัติลงระบบได้ทันทีเลยครับ` 
+              text: "ระบบ AI ยังไม่ได้ตั้งค่า API key จึงยังไม่สามารถวิเคราะห์ได้ครับ"
             }));
             return;
           }
@@ -1178,7 +1195,8 @@ export async function startStandaloneServer() {
               text: response.text || "รับทราบข้อมูลครับ" 
             }));
           } catch (e: any) {
-            ws.send(JSON.stringify({ type: "transcript", source: "ai", text: `รับทราบรายงานลักษณะพฤติกรรมแม่หมู #${sowTag} แล้วครับ แนะนำให้เตรียมบันทึกประวัติเข้าระบบได้เลยครับ` }));
+            console.error("[WS AI Error]", e);
+            ws.send(JSON.stringify({ type: "transcript", source: "ai", text: "ระบบ AI วิเคราะห์ไม่สำเร็จ กรุณาลองใหม่อีกครั้งครับ" }));
           }
         }
       } catch (err) {

@@ -17,7 +17,8 @@ Nipponfarm แยกซอร์สและวงจร deploy ออกจา�
 | Firebase Authentication | ผ่าน | เพิ่ม Authorized Domain และ Login สำเร็จ |
 | Existing Firestore data | ผ่านเบื้องต้น | ผู้ใช้ยืนยันว่าเห็นข้อมูลเดิม |
 | HTTP API `/api/health` | ผ่าน | Production ตอบ `{\"status\":\"ok\",\"aiProvider\":\"gemini\",\"aiReady\":false}` ตามผลทดสอบของผู้ใช้ |
-| Receipt/Swine AI | รอตั้งค่าและทดสอบ | ต้องมี `GEMINI_API_KEY` และทดสอบข้อมูลจริง |
+| AI endpoint authentication | ผ่านระดับโค้ด | Receipt/Swine/TTS และ WebSocket ตรวจ Firebase ID token; lint/build และ negative auth tests ผ่าน |
+| Receipt/Swine AI | รอตั้งค่าและทดสอบ | ต้องสร้าง `GEMINI_API_KEY` ใหม่ ใส่เฉพาะฝั่ง server แล้วทดสอบข้อมูลที่ไม่มีความลับ |
 | Email | รอตั้งค่าและทดสอบ | ต้องมี SMTP variables |
 | ImageKit/R2 | รอตั้งค่าและทดสอบ | ต้องใช้ credentials ใหม่ที่จำกัดสิทธิ์ |
 | Daily Cron | ไม่พร้อม | ต้องมี `CRON_SECRET` และหลักฐานการรัน |
@@ -36,9 +37,10 @@ Nipponfarm แยกซอร์สและวงจร deploy ออกจา�
 
 **M1 — Server Integration Verification**
 
-1. ตั้ง `APP_URL` และ `CRON_SECRET`
-2. ตรวจ production Build/Runtime Logs หลังแก้ `/api/health` สำเร็จ
-3. ตั้ง Gemini key แล้วทดสอบ AI หนึ่งกรณี
-4. ตั้ง SMTP แล้วส่ง test email
-5. ตัดสินใจ transport ใหม่สำหรับ Live AI
-6. สำรอง Firebase project เดิมก่อนเริ่มแยก project
+1. ตรวจ deployment ของชุดป้องกัน AI และยืนยัน endpoint ปฏิเสธ request ที่ไม่ล็อกอิน
+2. สร้าง Gemini key ใหม่และใส่ใน Vercel เป็น `GEMINI_API_KEY` (Production เท่านั้น)
+3. ตรวจ `/api/health` ให้ `aiReady` เป็น `true`
+4. ทดสอบ Receipt AI, Swine AI และ Text-to-Speech ด้วยบัญชีที่ล็อกอิน
+5. ตั้ง `APP_URL`, `CRON_SECRET` และ SMTP แล้วทดสอบตามลำดับ
+6. ตัดสินใจ transport ใหม่สำหรับ Live AI บน Vercel
+7. สำรอง Firebase project เดิมก่อนเริ่มแยก project

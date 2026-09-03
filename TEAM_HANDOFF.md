@@ -23,6 +23,7 @@
 - HTTP backend: Express exported from `api/index.ts`
 - Auth/Data/primary images: Firebase
 - AI: Gemini through `server/aiProvider.ts`
+- AI security: REST endpoints and standalone WebSocket require a verified Firebase ID token
 - Video: Cloudflare R2
 - Optional image gateway: ImageKit
 - Scheduled task: Vercel Cron at 22:00 UTC (05:00 Asia/Bangkok)
@@ -40,6 +41,7 @@
 - Vercel connector ใน ChatGPT ยังไม่ list project แม้ Dashboard แสดง project แล้ว
 - Production API logs ยังไม่ได้ตรวจ
 - Server-only environment variables ยังไม่ครบ
+- Gemini ยังไม่พร้อมจนกว่าจะตั้ง `GEMINI_API_KEY`; ห้ามใช้ชื่อขึ้นต้น `VITE_`
 - Live AI WebSocket `/live` ยังไม่พร้อมบน Vercel handler
 - Firebase ยังเป็น project เดิมชื่อ `Thailottery`
 

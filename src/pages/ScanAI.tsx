@@ -6,6 +6,7 @@ import { subscribeToSow, recordEvent } from '../services/sowService';
 import { Sow, EventType } from '../types';
 import { useBottomSheet } from '../contexts/BottomSheetContext';
 import { useAuth } from '../contexts/AuthContext';
+import { authenticatedFetch } from '../lib/authenticatedFetch';
 import clsx from 'clsx';
 
 export default function ScanAI() {
@@ -120,7 +121,7 @@ export default function ScanAI() {
   const speakText = async (text: string) => {
     try {
       setAiIsSpeaking(true);
-      const response = await fetch('/api/text-to-speech', {
+      const response = await authenticatedFetch('/api/text-to-speech', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, voice: 'Zephyr' })
@@ -180,6 +181,10 @@ export default function ScanAI() {
       setIsStreaming(true);
 
       // 2. Establish WebSocket connection to backend live bridge
+      if (!user) {
+        throw new Error('กรุณาลงชื่อเข้าใช้ก่อนเริ่มสแกนด้วย AI');
+      }
+      const idToken = await user.getIdToken();
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsUrl = `${protocol}//${window.location.host}/live`;
       const ws = new WebSocket(wsUrl);
@@ -193,6 +198,7 @@ export default function ScanAI() {
         // Send initial setup message
         ws.send(JSON.stringify({
           type: 'start',
+          idToken,
           sowId: id,
           sowTag: sow?.sowId,
           breed: sow?.breed,
@@ -302,24 +308,6 @@ export default function ScanAI() {
     showLoading('AI กำลังวิเคราะห์สรีระและประเมินผลอย่างละเอียด...');
     
     try {
-      // Trigger API call directly to server's generateContent
-      const response = await fetch('/api/receipt-analyze', { // wait, let's create a dedicated custom analysis endpoint, or use standard text/image gemini
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image: frame,
-          historicalDescriptions: [
-            `Sow ID: ${sow?.sowId}`,
-            `Breed: ${sow?.breed}`,
-            `Parity: ${sow?.parity}`,
-            `Current Status: ${sow?.status}`,
-            `Evaluation Mode: ${streamMode === 'ESTRUS' ? 'ตรวจสัด' : 'ตรวจท้อง'}`
-          ]
-        })
-      });
-
-      // But since we want to evaluate estrus/pregnancy, let's build a dedicated endpoint or handle it cleanly.
-      // Wait, let's look at how we can implement a custom REST analysis fallback or use the live socket.
       if (isAiConnected && socketRef.current) {
         socketRef.current.send(JSON.stringify({
           type: 'text_query',
@@ -334,7 +322,7 @@ export default function ScanAI() {
 
         // Let's call standard AI on backend or use our high-fidelity swine breeding AI engine!
         // We will make a custom fetch to a new endpoint `/api/swine-ai-analyze` that we will write shortly in server.ts!
-        const analyzeRes = await fetch('/api/swine-ai-analyze', {
+        const analyzeRes = await authenticatedFetch('/api/swine-ai-analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -385,7 +373,7 @@ export default function ScanAI() {
     } else {
       // Offline fallback
       showLoading('กำลังส่งคำถามไปยัง AI...');
-      fetch('/api/swine-ai-analyze', {
+      authenticatedFetch('/api/swine-ai-analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
