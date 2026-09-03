@@ -1,12 +1,7 @@
 import express from "express";
 import path from "path";
-import http from "http";
-import { WebSocketServer, WebSocket } from "ws";
-import { createServer as createViteServer } from "vite";
 import { Type } from "@google/genai";
 import dotenv from "dotenv";
-import { initDailyTasksCron, triggerDailyTasksAlert } from "./server/dailyTasksAlert";
-import { getUploadPresignedUrl, getDownloadPresignedUrl, verifyUserIsActive, extractKeyFromUrl } from "./server/r2Service";
 import { aiModels, createAiClient, getAiProviderName, isAiConfigured } from "./server/aiProvider";
 
 
@@ -773,6 +768,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
   app.post("/api/trigger-daily-tasks-alert", async (req, res) => {
     try {
       console.log("[API Endpoint] Manual trigger of Daily Breeding Tasks Alert received.");
+      const { triggerDailyTasksAlert } = await import("./server/dailyTasksAlert");
       const result = await triggerDailyTasksAlert();
       res.json({
         success: true,
@@ -796,6 +792,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
     }
 
     try {
+      const { triggerDailyTasksAlert } = await import("./server/dailyTasksAlert");
       const result = await triggerDailyTasksAlert();
       return res.json({ success: true, result });
     } catch (err: any) {
@@ -819,6 +816,8 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
       if (!key) {
         return res.status(400).json({ success: false, error: "กรุณาระบุ key สำหรับเก็บไฟล์" });
       }
+
+      const { getUploadPresignedUrl, verifyUserIsActive } = await import("./server/r2Service");
 
       // Check role permissions (must be ACTIVE ADMIN or STAFF)
       const isAuthorized = await verifyUserIsActive(userId);
@@ -854,6 +853,8 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
       if (!key) {
         return res.status(400).json({ success: false, error: "กรุณาระบุ key/URL ของไฟล์วิดีโอ" });
       }
+
+      const { getDownloadPresignedUrl, verifyUserIsActive, extractKeyFromUrl } = await import("./server/r2Service");
 
       // Check role permissions (must be ACTIVE ADMIN or STAFF)
       const isAuthorized = await verifyUserIsActive(userId);
@@ -1107,6 +1108,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
   });
 
   if (serveFrontend && process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -1124,12 +1126,15 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
 }
 
 async function startServer() {
+  const http = await import("node:http");
+  const { WebSocketServer } = await import("ws");
+  const { initDailyTasksCron } = await import("./server/dailyTasksAlert");
   const app = await createApp();
   const PORT = Number(process.env.PORT || 3000);
   const server = http.createServer(app);
   const wss = new WebSocketServer({ noServer: true });
 
-  wss.on("connection", (ws: WebSocket) => {
+  wss.on("connection", (ws) => {
     console.log("[WS Connection] Client connected to Live AI scan");
     let sowTag = "Unknown";
     let streamMode = "ESTRUS";
@@ -1202,6 +1207,10 @@ async function startServer() {
   });
 }
 
-startServer().catch(err => {
-  console.error("CRITICAL: Server failed to start:", err);
-});
+// Vercel imports createApp() from api/index.ts and owns the HTTP listener.
+// Starting a second listener during module initialization crashes the function.
+if (!process.env.VERCEL) {
+  startServer().catch(err => {
+    console.error("CRITICAL: Server failed to start:", err);
+  });
+}

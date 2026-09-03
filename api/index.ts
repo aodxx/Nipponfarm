@@ -1,5 +1,13 @@
 import { createApp } from "../server";
 
-const app = await createApp({ serveFrontend: false });
+let appPromise: ReturnType<typeof createApp> | undefined;
 
-export default app;
+function getApp() {
+  appPromise ??= createApp({ serveFrontend: false });
+  return appPromise;
+}
+
+export default async function handler(req: Parameters<Awaited<ReturnType<typeof createApp>>>[0], res: Parameters<Awaited<ReturnType<typeof createApp>>>[1]) {
+  const app = await getApp();
+  return app(req, res);
+}
