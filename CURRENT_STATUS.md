@@ -1,40 +1,48 @@
-# Niponfarm Current Status
+# Nipponfarm Current Status
 
-อัปเดตผล Audit: **4 กันยายน 2026** (repository commit `d2dd51639fd52c95a8622b4938fc60ae941e514f`, branch `audit/recovery-baseline`)
+อัปเดตผล Audit: **4 กันยายน 2026** จาก repository `aodxx/Nipponfarm`, branch `main`, commit `fba7c2d8a2aed3217e71c5b18e11c24a1adbfced` (`fix: preserve rejected advances on resubmission (#8)`). การตรวจครั้งนี้ทำในโฟลเดอร์ clone แยกและไม่มีการแก้ไขข้อมูล production, Firebase, Vercel หรือ secrets.
 
 ## สรุป
 
-Niponfarm อยู่ใน **Phase 0–1: migration validation และ server integration verification** ไม่ใช่ production complete. Source code อยู่บน GitHub และ production domain เปิดได้ แต่ยังไม่มีหลักฐานครบสำหรับการเขียนข้อมูล, external integrations, runtime logs, PWA recovery และการแยก Firebase project.
+Nipponfarm อยู่ใน **Phase 0–1: migration validation และ server integration verification** ไม่ใช่ production complete. Frontend เปิดได้, API health ทำงาน และ baseline authorization ถูก merge แล้ว แต่ยังไม่มีหลักฐานครบสำหรับ Firebase CRUD/permissions, AI success path, external integrations, runtime logs, PWA recovery และ Live AI บน Vercel.
 
-จากขอบเขตที่ตรวจได้ใน audit นี้ ระบบใช้งานได้ประมาณ **55% ของเกณฑ์ production ที่ระบุใน verification checklist**. ตัวเลขนี้เป็น readiness estimate ไม่ใช่ uptime หรือความสำเร็จของผู้ใช้จริง.
+จากเกณฑ์ production ใน verification checklist ระบบพร้อมใช้งานประมาณ **55%**. ตัวเลขนี้เป็น readiness estimate จากหลักฐานที่ตรวจได้ ไม่ใช่ uptime หรืออัตราความสำเร็จของผู้ใช้.
 
 ## สิ่งที่ผ่านแล้ว
 
-- GitHub repository `aodxx/Nipponfarm`, branch `main` มี working tree สะอาด และ CI ล่าสุดที่ตรวจพบผ่าน.
-- หน้า production `https://nipponfarm.vercel.app` ตอบ HTTP 200 และ HTML โหลดได้.
-- `GET /api/health` ตอบ HTTP 200 พร้อม `status: ok` และ `Cache-Control: no-store`.
-- `GET /api/weather` ตรวจ validation กรณีไม่มีพิกัดและตอบ HTTP 400 ตามคาด.
-- AI REST endpoints ที่ไม่มี Firebase ID token ถูกปฏิเสธ HTTP 401.
-- Cron endpoint ที่ไม่มี `CRON_SECRET` ถูกปฏิเสธ HTTP 401.
-- `npm ci`, `npm run lint` และ `npm run build` ผ่านบนโค้ด commit ที่ตรวจ.
-- Firebase client config ใช้ `VITE_` environment variables และไม่มีค่า secret ใน working tree.
-- Firestore มี default deny และแยก role `ADMIN`, `STAFF`, `PENDING`, `RESIGNED` ในกฎหลัก.
+- Repository สะอาดบน branch `main`; current HEAD คือ `fba7c2d`.
+- `npm ci` ผ่าน; dependency ติดตั้งได้.
+- `npm run test:auth` ผ่าน 9/9 tests.
+- Payroll และ audit tests ที่รันแยกผ่าน 15/15 tests.
+- `npm run lint` ผ่าน (`tsc --noEmit`).
+- `npm run build` ผ่านทั้ง Vite และ esbuild server bundle.
+- Production homepage `https://nipponfarm.vercel.app/` ตอบ HTTP 200.
+- Production `GET /api/health` ตอบ HTTP 200 และคืน `status: ok`, `aiProvider: gemini`, `aiReady: false`, `aiStatus: AI_NOT_CONFIGURED`.
+- Production `/api/weather` เมื่อไม่มีพิกัดตอบ HTTP 400 ตาม validation.
+- AI, email, R2 และ upload routes ที่เรียกโดยไม่มี token ตอบ HTTP 401.
+- Cron route ที่ไม่มี secret ตอบ HTTP 401.
+- ไม่พบ secret รูปแบบชัดเจนใน tracked source จากการ scan (`AIza`, private key, AWS access key, token patterns).
+- Firebase client configuration ใช้ `VITE_FIREBASE_*`; server secrets ไม่ถูก hard-code ในโค้ดที่ตรวจ.
 
 ## สิ่งที่ยังไม่ผ่านหรือยังไม่มีหลักฐาน
 
-- Production health รายงาน `aiReady: false`; ยังไม่ยืนยัน `GEMINI_API_KEY` และยังไม่ได้ทดสอบ AI ด้วยบัญชีจริง.
-- ยังไม่ยืนยัน SMTP, ImageKit, Cloudflare R2, `CRON_SECRET` และ server-only variables ใน Vercel.
-- ยังไม่ได้ทำ Firestore/Storage CRUD test record แบบ create/read/update/delete และไม่มีหลักฐานทดสอบบัญชีสิทธิ์ต่ำ.
+- `aiReady:false`: ยังไม่มีหลักฐานว่า `GEMINI_API_KEY` ถูกตั้งบน production และยังไม่ได้ทดสอบ AI success path ด้วย test account.
+- ยังไม่ได้ตรวจ SMTP, ImageKit, Cloudflare R2, `CRON_SECRET` และ server-only variables ใน Vercel.
+- ยังไม่ได้ทำ Firestore/Storage CRUD ด้วย test record แยกจากข้อมูลจริง หรือทดสอบ role matrix แบบ runtime.
 - ยังไม่ได้ตรวจ Vercel runtime logs หลังเรียก API.
-- Live AI WebSocket `/live` ยังไม่อยู่ใน Vercel function handler.
-- PWA install, offline shell, update และ recovery ยังไม่ถูกทดสอบ.
-- ระบบยังใช้ Firebase project เดิมชื่อ `Thailottery`; ยังไม่มี backup/reconciliation และ cutover plan ที่ทำจริง.
-- `TECHNICAL_DOCUMENTATION.md` ยังกล่าวถึง Cloud Run/Nginx ขณะที่ deployment ปัจจุบันเป็น Vercel จึงต้องถือว่าเอกสารเดิมมีข้อมูลล้าสมัยบางส่วน.
+- Local standalone startup ล้มเหลวเมื่อไม่มี Firebase env: `dailyTasksAlert.ts` เรียก `getFirebaseRuntimeConfig()` ตอน import/startup.
+- Live AI WebSocket `/live` อยู่ใน standalone Node server แต่ไม่ได้ export ผ่าน `api/index.ts` ของ Vercel.
+- PWA install, offline shell, update และ recovery ยังไม่ได้ทดสอบบนอุปกรณ์จริง.
+- Firebase ยังอ้าง project เดิมชื่อ `Thailottery`; ยังไม่มี inventory, backup และ reconciliation ก่อนแยก project.
+- Storage rules อนุญาต signed-in user อ่าน/เขียน `news`, `bills`, `maintenance` กว้างเกิน least privilege.
+- Firestore rules บาง collection เช่น `sows`, `events`, `tasks`, `pig_sales`, `chat` และ settings ใช้ active-user policy กว้าง และยังต้องพิสูจน์ farm/owner boundary.
+- Main JS bundle ประมาณ 4.62 MB ก่อน gzip (1.08 MB หลัง gzip); มี lottie `eval` warning และ dynamic/static import duplication.
+- เอกสารบางฉบับยังอ้าง commit เก่า (`d2dd516`, `7c37c43`) หรือ Cloud Run/Nginx ทั้งที่ deployment ปัจจุบันเป็น Vercel.
 
 ## Phase decision
 
-ให้คงระบบไว้ที่ **migration validation** และห้ามประกาศ production readiness จนกว่า production integration verification, CRUD/permission evidence, runtime logs และ P0/P1 integration verification จะผ่าน. Server endpoint authorization baseline ถูก merge แล้วและอยู่ระหว่างรอ production verification ตาม `KNOWN_ISSUES.md`.
+คงสถานะไว้ที่ **migration validation / controlled integration verification**. ห้ามประกาศ production readiness จนกว่า P0/P1 integration, CRUD/permission evidence, runtime logs และ recovery checks จะผ่าน.
 
 ## สิ่งที่ไม่ได้ทำโดยตั้งใจ
 
-Audit นี้ไม่เพิ่มฟีเจอร์, ไม่เปลี่ยน architecture, ไม่ deploy, ไม่แก้ Firebase rules, ไม่ลบหรือแก้ข้อมูลจริง และไม่ rotate/revoke credentials เพราะเป็นการเปลี่ยนแปลงที่ต้องมี owner approval และ cutover plan.
+Audit นี้ไม่เพิ่ม feature, ไม่ refactor ใหญ่, ไม่ deploy, ไม่แก้ Firebase/Storage rules, ไม่เขียน/ลบข้อมูลจริง และไม่ rotate/revoke credentials. การแก้ standalone initialization, dependency, permissions หรือ transport เป็นงานแยกที่ต้องมี test และ rollout plan.

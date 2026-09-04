@@ -1,25 +1,22 @@
-# Niponfarm Known Issues
+# Nipponfarm Known Issues
 
-อัปเดตผล Audit: **4 กันยายน 2026**. Severity ใช้ P0 = เสี่ยงต่อความปลอดภัย/ข้อมูลหรือขวาง production, P1 = สำคัญต่อความเสถียรและการรับรองระบบ, P2 = ปรับปรุงภายหลัง.
+อัปเดตผล Audit: **4 กันยายน 2026**. Severity: P0 = ความเสี่ยงด้านความปลอดภัย/ข้อมูลหรือขวาง production, P1 = สำคัญต่อเสถียรภาพและการรับรองระบบ, P2 = ปรับปรุงภายหลัง.
 
 | Severity | Issue | Cause / Evidence | Impact | Recommended direction |
-| --- | --- | --- | --- | --- |
-| RESOLVED / VERIFY | Server email endpoints authorization baseline | Commit `ec276f5` เพิ่ม Firebase auth middleware/role gate; ยังต้องทดสอบ success/unauthorized บน production | ต้องมีหลักฐาน runtime ว่า role และ recipient policy ทำงานจริง | รัน production verification และเก็บหลักฐานโดยไม่ใช้ข้อมูลเงินจริง |
-| RESOLVED / VERIFY | Upload gateway authorization baseline | Commit `ec276f5` เพิ่ม active-user auth และ image payload limit | ยังต้องยืนยัน file type/path/size และ abuse behavior บน runtime | เพิ่ม integration test และตรวจ logs โดยไม่เปิดเผย payload |
-| RESOLVED / VERIFY | R2 authorization baseline | Commit `ec276f5` bind body UID กับ authenticated UID และ validate key/content type | ยังไม่มี production evidence และ ownership/path test ครบ | ทดสอบ wrong-owner/invalid-key และ presigned URL lifecycle |
-| P0 | Firebase project เดิมชื่อ `Thailottery` ยังใช้งานร่วมความเสี่ยง | ระบุใน `PROJECT_STATUS.md`/handoff; ไม่มี inventory/backup/reconciliation | rules หรือการตั้งค่าผิดอาจกระทบข้อมูลระบบอื่น | backup, inventory, count reconciliation และแยก project ตาม migration runbook |
-| P1 | AI production ยังไม่พร้อม | Production health = `aiReady:false`; `GEMINI_API_KEY` ยังไม่ยืนยัน | Receipt/Swine/TTS ใช้งานจริงไม่ได้ | ตั้ง secret ฝั่ง server แล้วทดสอบ success/error paths ด้วย test account |
-| P1 | Standalone runtime เริ่มไม่ได้เมื่อ local env ไม่มี Firebase config | `startStandaloneServer()` eager-import `dailyTasksAlert.ts`, ซึ่งเรียก `getFirebaseRuntimeConfig()` ทันที | local smoke test และ standalone deployment ที่ env ไม่ครบหยุดตั้งแต่ startup แม้ health route อาจไม่ต้องใช้ Firebase | แยก initialization แบบ lazy/ตรวจ env ที่ขอบเขต cron และเพิ่ม startup smoke test ด้วย env ครบ/ไม่ครบ โดยไม่ใส่ค่าจริงใน repository |
-| P1 | Live AI ไม่รองรับ Vercel handler | WebSocket อยู่ใน standalone server แต่ `api/index.ts` export Express HTTP app | ScanAI live mode ใช้งานบน production ไม่ได้ | เลือก SSE/HTTP streaming หรือแยก WebSocket runtime แล้วทดสอบ reconnect/auth |
-| P1 | Firebase Storage rules กว้างเกิน least privilege | `news`, `bills`, `maintenance` อนุญาต read/write แก่ signed-in ทุกคน | ผู้ใช้ที่ล็อกอินอาจเขียน/อ่านข้าม farm หรือแก้ไฟล์ที่ไม่ควรแก้ | ทำ path ownership/role rules และทดสอบ emulator ก่อน deploy; ระวัง project shared |
-| P1 | Firestore บาง collection ให้สิทธิ์กว้าง | chat, farm settings, master ingredients ใช้ `isActiveUser()` สำหรับ write ทั้ง document | staff อาจแก้ข้อมูลข้ามขอบเขตถ้าไม่มี ownership field | inventory schema และเขียน rules แบบ owner/admin |
-| P1 | ไม่มี runtime log evidence | Checklist ยังไม่ได้ตรวจ logs | error ใน production อาจไม่ถูกพบ | เปิด Vercel logs, เพิ่ม structured request/error IDs โดยไม่ log secrets/PII |
-| P1 | Dependency vulnerabilities | `npm ci` วันที่ 4 ก.ย. 2026 รายงาน 29 issues รวม 2 critical/16 high/7 moderate/4 low | supply-chain/runtime risk; บางรายการเป็น transitive | ทำ dependency remediation branch, lockfile review และ regression test; ไม่ force upgrade ทันที |
-| RESOLVED / VERIFY | Advance duplicate guard และ rejected resubmit | เพิ่ม deterministic `submissionKey`, Firestore transaction และแก้ rejected resubmit ให้สร้าง document ใหม่โดยไม่แก้ history เดิม | ต้องยืนยัน concurrent duplicate และ Submit → Reject → Resubmit ด้วย emulator/test account | เพิ่ม emulator/production test evidence |
-| RESOLVED / VERIFY | Payroll audit trail เดิมไม่ครบ | เพิ่ม `payroll_audit_events` และเขียน approve/reject transition ใน transaction เดียวกับ status update; มี policy tests | ยังไม่มี emulator/production test-account evidence และยังไม่ครอบคลุม payslip/base salary change ทุก flow | เพิ่ม emulator CRUD/permission tests และขยาย audit coverage ตาม workflow ก่อน production sign-off |
-| P1 | Bundle ใหญ่ | build รายงาน main chunk ~4.6 MB pre-gzip | โหลดช้าในพื้นที่ฟาร์ม/เครือข่ายจำกัด | route-level code splitting และวัด mobile performance |
-| P2 | เอกสาร infrastructure ไม่ตรง deployment | `TECHNICAL_DOCUMENTATION.md` ระบุ Cloud Run/Nginx แต่ปัจจุบันเป็น Vercel | ทีมอาจ deploy/debug ผิดระบบ | อัปเดตเอกสารหลัง security baseline |
-| P2 | ชื่อ package/version ยังเป็น generic | `package.json` name `react-example`, version `0.0.0` | traceability/release management ต่ำ | เปลี่ยนเป็น controlled release task พร้อม CI/release policy |
-| P2 | Build warning จาก `lottie-web` และ import duplication | Vite build warnings | maintenance และ bundle split ไม่เหมาะสม | แยกเป็น performance cleanup หลัง P0/P1 |
+|---|---|---|---|---|
+| P0 | Firebase project เดิมชื่อ `Thailottery` ยังใช้งานร่วมความเสี่ยง | เอกสารและ config ระบุ project เดิม; ยังไม่มี inventory/backup/reconciliation | Rules/config ผิดอาจกระทบข้อมูลระบบอื่น | ทำ inventory, export/backup และ count reconciliation ก่อนเปลี่ยน project/rules |
+| P1 | AI production ยังไม่พร้อม | `/api/health` = `aiReady:false`, `AI_NOT_CONFIGURED` | Receipt/Swine/TTS ใช้งานจริงไม่ได้ | ตั้ง `GEMINI_API_KEY` ฝั่ง server แล้วทดสอบ success/error ด้วย test account |
+| P1 | Standalone startup ต้องการ Firebase env ตั้งแต่ import | `dailyTasksAlert.ts` เรียก `getFirebaseRuntimeConfig()` ตอน start | local smoke test/standalone start หยุดแม้ route ที่ไม่ใช้ Firebase | lazy-init ที่ขอบเขต cron/service และเพิ่ม startup tests env ครบ/ไม่ครบ |
+| P1 | Live AI ไม่รองรับ current Vercel handler | WebSocket อยู่ใน standalone server; `api/index.ts` เป็น HTTP app | `/live` production ใช้งานไม่ได้ | เลือก SSE/HTTP streaming หรือแยก WS runtime พร้อม auth/reconnect test |
+| P1 | Firebase Storage rules กว้างเกิน least privilege | `news`, `bills`, `maintenance` allow signed-in read/write | user อาจอ่าน/เขียนข้ามขอบเขต | ออกแบบ path ownership/role rules และทดสอบ emulator ก่อน deploy |
+| P1 | Firestore ownership/farm boundary ยังไม่เข้มในบาง collection | `sows`, `events`, `tasks`, `pig_sales`, chat/settings ใช้ active-user policy กว้าง | staff อาจแก้ข้อมูลข้าม farm/owner หาก policy ไม่บังคับ | ทำ farmId/owner matrix และ emulator permission tests; ห้ามแก้ rules ทันทีบน shared project |
+| P1 | ไม่มี production runtime log evidence | ยังไม่ได้ตรวจ Vercel logs หลัง API calls | 5xx, auth หรือ PII leakage อาจไม่ถูกพบ | ตรวจ logs ด้วย owner access และเพิ่ม structured safe request/error IDs หากจำเป็น |
+| P1 | Dependency vulnerabilities | npm audit: 28 production issues (2 critical, 15 high, 7 moderate, 4 low) | supply-chain/runtime risk | ทำ remediation branch, review transitive path และ regression tests; ไม่ force upgrade |
+| P1 | Core workflows ยังไม่มี E2E/CRUD evidence | Sow, Receipt, Sale, Payroll, Maintenance ผ่าน static/code tests บางส่วนเท่านั้น | ไม่ยืนยันการใช้งานจริงของเกษตรกร | สร้าง isolated test account/project และรัน acceptance matrix |
+| P1 | Main bundle ใหญ่ | main JS ~4.62 MB pre-gzip; lottie/import warnings | โหลดช้าบนเครือข่ายฟาร์ม | route-level lazy loading และ library split หลัง integration baseline |
+| RESOLVED / VERIFY | Server endpoint authorization baseline | middleware และ ownership checks merged; unauthenticated smoke routes 401 | success/role runtime ยังไม่พิสูจน์ | ทดสอบ ADMIN/STAFF/PENDING/wrong-owner บน preview/test data |
+| RESOLVED / VERIFY | Payroll idempotency/rejected resubmit/audit | code tests ผ่าน; payroll tests แยก 15/15 | ยังไม่มี emulator/production evidence | ทดสอบ concurrent duplicate, approve/reject/resubmit และ audit persistence |
+| P2 | Infrastructure documentation mismatch | `TECHNICAL_DOCUMENTATION.md` ระบุ Cloud Run/Nginx แต่ปัจจุบัน Vercel | ทีมอาจ debug/deploy ผิดระบบ | อัปเดตเอกสารหลัง P0/P1 verification |
+| P2 | Generic package metadata | package name `react-example`, version `0.0.0` | traceability/release management ต่ำ | controlled release task พร้อม changelog/policy |
 
-ไม่มีการลบข้อมูลจริง, deploy rules หรือ rotate credential ใน Audit นี้.
+ไม่มีการลบข้อมูลจริง, deploy rules หรือ rotate/revoke credential ใน Audit นี้.

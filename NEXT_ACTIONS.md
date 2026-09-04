@@ -1,163 +1,45 @@
-# Niponfarm Next Actions
+# Nipponfarm Next Actions
 
-อัปเดต: **4 กันยายน 2026**
+อัปเดต: **4 กันยายน 2026** จาก Audit commit `fba7c2d`.
 
-> แผนงานหลักช่วงถัดไปให้อ้างอิง `NIPPONFARM_CORE_WORKFLOW_UX_CONSOLIDATION.md` เป็นเอกสารกลางสำหรับงาน Consolidation ทั้งระบบ
+## หลักการ
 
-## สถานะสำคัญ
+ยังไม่เพิ่ม feature ใหม่และยังไม่เปลี่ยน architecture ครั้งใหญ่. ห้ามลบหรือแก้ Firebase data, rules, hosting configuration หรือ secrets เดิมโดยไม่มี owner approval, backup และ rollback plan. ทุก code change ต้องมี test, `npm run lint` และ `npm run build`.
 
-- งาน server endpoint authorization baseline ถูกดำเนินการและ merge แล้ว
-- ห้ามกลับไปทำงาน P0 เดิมซ้ำโดยไม่ตรวจ commit ล่าสุด
-- งานถัดไปต้องเปลี่ยนจาก “เพิ่มฟีเจอร์” ไปเป็น “พิสูจน์ workflow หลัก + ลดความซับซ้อน + ทำระบบให้ใช้งานจริงได้ครบวงจร”
+## P0 — ต้องแก้/พิสูจน์ก่อน
 
-## P0 — Production & Integration Verification
+1. **Firebase safety baseline:** ระบุ project/database/region, rules/indexes, collections, user counts และ Storage objects ของ project เดิม `Thailottery`; ทำ backup/export และ reconciliation โดยไม่ลบหรือแก้ข้อมูล.
+2. **Production integration gate:** ยืนยันชื่อ server-only variables โดยไม่เปิดเผยค่า, ตั้ง/ตรวจ `GEMINI_API_KEY` ชุดใหม่ตาม owner process และทำ preview/test-account verification.
+3. **Authorization evidence:** ทดสอบ unauthenticated, PENDING, STAFF, ADMIN และ wrong-owner ต่อ routes และ core data ด้วยข้อมูลแยก.
 
-1. ยืนยัน `GEMINI_API_KEY` และทำให้ production health รายงาน `aiReady: true`
-2. ทดสอบ Gemini success path จริงอย่างน้อย 1 workflow ด้วย test account/data
-3. ทำ Firestore CRUD test: create/read/update/delete ด้วย test record ที่แยกจากข้อมูลจริง
-4. ทำ Firebase Storage upload/download/delete test
-5. ตรวจ authorization ของ role หลัก: unauthenticated, pending, staff, admin และ wrong-owner
-6. ยืนยัน SMTP, `CRON_SECRET`, ImageKit/R2 และ server-only environment variables ตามที่ใช้งานจริง
-7. ตรวจ Vercel runtime logs หลังเรียก API สำคัญ
-8. ตรวจ Firebase project `Thailottery` inventory/backup/reconciliation ก่อนเปลี่ยน rules หรือ migration
+## P1 — สำคัญ
 
-## P1 — Nipponfarm Core Workflow & UX Consolidation
+- แก้ standalone eager initialization ด้วย lazy boundary และ startup test; ห้ามทำก่อนบันทึก root cause/มี regression test.
+- ตัดสินใจ transport สำหรับ Live AI ที่รองรับ Vercel หรือแยก runtime.
+- ตรวจและปรับ Storage/Firestore ownership policy ผ่าน emulator ก่อน deploy rules.
+- ตรวจ Vercel runtime logs หลัง smoke requests โดยไม่เก็บ secret, PII หรือ raw payload.
+- ทำ dependency remediation branch สำหรับ critical/high issues โดยเฉพาะ `protobufjs`/`xlsx` และรัน regression.
+- รัน core workflow acceptance matrix ครบ: Sow Lifecycle, Receipt → Expense, Pig Sale, Payroll & Advance, Maintenance.
+- ลด initial bundle หลัง integration verification ผ่าน.
 
-ดำเนินงานตาม `NIPPONFARM_CORE_WORKFLOW_UX_CONSOLIDATION.md`
+## P2 — ปรับปรุงภายหลัง
 
-### Core workflows ที่ต้องพิสูจน์
-
-1. Sow Lifecycle
-2. Receipt → Expense
-3. Pig Sale
-4. Payroll & Advance
-5. Maintenance
-
-### UX / Frontend priorities
-
-- ลด primary navigation ให้เหลือกลุ่มงานหลัก
-- Dashboard ต้องตอบว่า “วันนี้ต้องทำอะไร”
-- refactor `Dashboard.tsx`
-- refactor `ScanReceipt.tsx`
-- แยก large pages อื่นตามลำดับความเสี่ยง
-- เพิ่ม use-case hooks ระหว่าง UI กับ services
-- route-level lazy loading
-- ลด initial bundle
-
-### Data foundation priorities
-
-- ออกแบบ `farmId` strategy
-- permission matrix
-- audit trail สำหรับธุรกรรมสำคัญ
-- ลด hard-coded admin bypass ในระยะยาวโดยมี recovery plan
-
-## P1 — Technical Health
-
-1. แก้ critical/high dependency vulnerabilities แบบมี regression test
-2. ห้ามใช้ `npm audit fix --force` โดยไม่ review
-3. จัดการ `xlsx` ด้วย risk decision หรือ replacement plan หากไม่มี safe fix
-4. ลด main bundle จาก baseline
-5. แก้ import duplication / heavy library loading
-
-## P2 — Field Reliability
-
-1. PWA install/offline/update/relogin acceptance test บน Android จริง
-2. ออกแบบ pending sync state
-3. ทดลอง offline write workflow อย่างน้อย 1 workflow ที่ไม่ใช่การเงิน
-4. unified loading/success/error/retry/sync feedback
-
-## P2 — Business Intelligence
-
-ทำหลัง data quality ผ่านแล้ว:
-
-- รายรับ/รายจ่าย
-- feed cost trend
-- cost per pig
-- sow performance
-- maintenance backlog
-- payroll cost
-- sale price trend
-- farm operating summary
+- PWA install/offline/update/relogin acceptance test บน Android จริง.
+- ออกแบบ pending sync สำหรับ workflow ภาคสนามที่ไม่ใช่ธุรกรรมการเงิน.
+- อัปเดต technical documentation ให้ตรงกับ Vercel.
+- ตั้ง package metadata/release version/changelog ให้เหมาะกับระบบจริง.
+- ทำ dashboard/BI หลัง data quality และ permission boundary ผ่าน.
 
 ## NEXT TASK
 
-**Task 1: Core Workflow Verification Baseline — เสร็จแล้วในระดับเอกสาร/static verification**
+**Task 1: สร้าง Firebase Safety & Integration Verification Packet บนสภาพแวดล้อมทดสอบที่แยกจาก production**
 
-สร้าง verification matrix สำหรับ 5 workflow หลักไว้ที่ `docs/CORE_WORKFLOW_VERIFICATION_MATRIX.md`:
+ขอบเขตของงานเดียวนี้คือรวบรวม project inventory/backup evidence ที่ owner อนุมัติ, ใช้ test account/data แยก, ตรวจ `GEMINI_API_KEY` readiness และรัน authorization/API smoke matrix พร้อมบันทึก timestamp, environment, status และ cleanup proof. ห้ามเปลี่ยน Firestore rules, migrate/delete data, rotate/revoke credential หรือเปิดใช้งาน external integration ใน production ระหว่างงานนี้.
 
-1. Sow Lifecycle
-2. Receipt → Expense
-3. Pig Sale
-4. Payroll & Advance
-5. Maintenance
+## Definition of Done ของ NEXT TASK
 
-แต่ละ workflow ต้องมี:
-
-- entry point
-- page/component
-- service/API
-- Firestore/Storage collection
-- user roles
-- happy path
-- failure path
-- permission test
-- reload/relogin persistence
-- mobile usability
-- blocker ปัจจุบัน
-
-ผลการจัดอันดับเลือก **Payroll & Advance** เป็น workflow ที่มี blocker สูงสุดและเป็น implementation task ถัดไป เนื่องจากเป็นธุรกรรมการเงิน มี approval/payslip หลายขั้น และยังขาด audit trail, regression tests และ production permission evidence
-
-## Definition of Done ของ Task 1
-
-- [x] verification matrix ครบทั้ง 5 workflow
-- [x] ระบุ PARTIAL / BLOCKED / NOT TESTED ตามหลักฐานที่มี
-- [x] มี blocker และ owner/action ของแต่ละปัญหา
-- [x] ไม่มีการเพิ่ม feature ใหม่ใน task นี้
-- [x] `PROJECT_STATUS.md`, `NEXT_ACTIONS.md`, `KNOWN_ISSUES.md` อัปเดตให้ตรงกับผลตรวจ
-- [x] lint/build/tests ที่เกี่ยวข้องผ่านก่อนสรุป task
-
-## Task 2: Payroll & Advance — Security, Consistency & Audit Baseline
-
-### Progress: duplicate submission guard — เสร็จแล้ว
-
-- [x] เพิ่ม `hasDuplicateAdvanceSubmission` และ `assertNoDuplicateAdvanceSubmission`
-- [x] เชื่อม guard เข้ากับ `employeeService.addAdvance` ก่อน `addDoc`
-- [x] แสดง duplicate-specific feedback ใน `AdvanceRequest`
-- [x] เพิ่ม submit-flow tests และผ่าน 7/7
-- [x] ไม่เปลี่ยน Firestore rules และไม่แตะข้อมูล production
-
-ข้อจำกัดเดิม: query-before-add เพียงอย่างเดียวป้องกัน retry ปกติแต่ไม่ป้องกัน concurrent writes แบบ atomic; ได้ยกระดับใน progress ด้านล่างแล้ว
-
-### Progress: transaction-safe idempotency — เสร็จแล้ว
-
-- [x] เพิ่ม deterministic `submissionKey` จาก user/date/amount
-- [x] ใช้ Firestore transaction อ่าน/เขียน deterministic document เดียวเพื่อป้องกัน concurrent duplicate ของ submission ใหม่
-- [x] รักษา legacy records เดิมโดยไม่ลบหรือ migrate และตรวจ duplicate ก่อนเขียน
-- [x] เพิ่ม tests ของ key normalization และ transaction decision behavior
-- [x] payroll tests 8/8, authorization tests 5/5, lint และ build ผ่าน
-
-ข้อจำกัด: รายการเก่าที่ไม่มี `submissionKey` ยังต้องผ่าน legacy lookup; ยังต้องทดสอบ emulator/production test account ก่อนถือว่า payroll production-ready
-
-### Progress: payroll audit trail และ owner/admin policy tests — เสร็จในระดับ code/test
-
-- [x] เพิ่ม `payroll_audit_events` schema builder โดยเก็บ actor, target, transition และ metadata ที่ปลอดภัย
-- [x] ผูกการ approve/reject advance กับการเขียน audit event ใน transaction เดียวกับ status update
-- [x] เพิ่ม Firestore rule: admin อ่าน/สร้างได้เมื่อ `actorUid` ตรงกับผู้ล็อกอิน; ไม่มี update/delete
-- [x] เพิ่ม owner/admin/wrong-owner policy tests 6/6
-- [x] ไม่เก็บ password, token, secret หรือ slip image ใน audit metadata
-
-ข้อจำกัด: ยังไม่ได้รัน Firebase Emulator หรือ production test-account CRUD เพราะ repository ยังไม่มี emulator harness; ต้องทำเป็น verification task ถัดไปก่อน production sign-off
-
-### Progress: rejected advance resubmission — แก้ใน code/test รอ merge
-
-- [x] rejected record เดิมถูกปฏิบัติเป็น immutable history
-- [x] resubmit ใช้ document ใหม่แทนการ `transaction.update` record เดิม
-- [x] เพิ่ม regression test สำหรับ write mode ของ `REJECTED`, `PENDING` และ `APPROVED`
-- [ ] ยืนยัน Submit → Reject → Resubmit ด้วย Firebase Emulator/test account
-
-1. เพิ่ม unit tests สูตร advance/payroll และ net salary
-2. กำหนด transaction identity/idempotency สำหรับ request, approval และ payslip
-3. เพิ่ม audit record สำหรับ approve/reject/change โดยไม่เก็บ secret หรือข้อมูลเกินจำเป็น
-4. ตรวจความสอดคล้องของ `EmployeeTransaction` กับ `employee_transactions` โดยไม่ migrate หรือลบข้อมูล production
-5. เพิ่ม integration tests owner/admin/wrong-owner ก่อนแก้ Firestore rules
-6. รัน lint, auth tests และ build ก่อนสรุป
+- มี project ID/database ID/region/rules/index inventory โดยไม่บันทึก secret.
+- มี backup/export และ record-count reconciliation ที่ตรวจย้อนกลับได้.
+- Health readiness และ API auth matrix มีหลักฐานจาก test environment.
+- ไม่มี production record ถูกสร้าง แก้ หรือลบโดยไม่ตั้งใจ.
+- รายงาน `CURRENT_STATUS.md`, `TEST_REPORT.md`, `KNOWN_ISSUES.md` อัปเดตด้วยผลจริง.
