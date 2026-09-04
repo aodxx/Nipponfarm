@@ -1,0 +1,31 @@
+name: Firebase Rules
+
+on:
+  pull_request:
+    paths:
+      - 'firestore.rules'
+      - 'firebase.json'
+      - 'scripts/firestore-rules-emulator-test.mjs'
+      - '.github/workflows/firebase-rules.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  firestore-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - name: Install isolated emulator test tooling
+        run: npm install --no-save --package-lock=false firebase-tools@15.28.2 @firebase/rules-unit-testing@5.0.2
+      - name: Run Firestore rules in isolated emulator
+        run: npx firebase emulators:exec --only firestore --project nipponfarm-rules-ci "node scripts/firestore-rules-emulator-test.mjs"
