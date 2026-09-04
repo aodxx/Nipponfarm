@@ -5,6 +5,7 @@ import {
   assertSucceeds,
 } from '@firebase/rules-unit-testing';
 import {
+  deleteDoc,
   doc,
   getDoc,
   setDoc,
@@ -65,6 +66,15 @@ const maintenanceA = {
   createdAt: 1,
 };
 
+const advanceA = {
+  userId: 'staff-a',
+  amount: 100,
+  date: '2026-09-04',
+  status: 'PENDING',
+  createdAt: 1,
+  updatedAt: 1,
+};
+
 try {
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
@@ -86,6 +96,7 @@ try {
   const pendingDb = testEnv.authenticatedContext('pending-test').firestore();
   const resignedDb = testEnv.authenticatedContext('resigned-test').firestore();
 
+  // Existing-owner boundaries.
   await assertSucceeds(updateDoc(doc(staffADb, 'bills', 'bill-a'), { vendorName: 'QA Vendor A Updated' }));
   await assertSucceeds(updateDoc(doc(staffADb, 'bill_items', 'bill-item-a'), { description: 'QA Item Updated' }));
   await assertSucceeds(updateDoc(doc(staffADb, 'pig_prices', 'pig-price-a'), { price: 83 }));
@@ -95,22 +106,55 @@ try {
   await assertFails(updateDoc(doc(staffBDb, 'bill_items', 'bill-item-a'), { userId: 'staff-b', description: 'stolen' }));
   await assertFails(updateDoc(doc(staffBDb, 'pig_prices', 'pig-price-a'), { userId: 'staff-b', price: 99 }));
   await assertFails(updateDoc(doc(staffBDb, 'maintenance_requests', 'maintenance-a'), { userId: 'staff-b', title: 'stolen' }));
-
   await assertSucceeds(updateDoc(doc(adminDb, 'bills', 'bill-a'), { vendorName: 'Admin correction' }));
 
+  // Payroll owner paths: active staff only.
   await assertFails(setDoc(doc(pendingDb, 'salary_advances', 'pending-advance'), {
     userId: 'pending-test', amount: 100, date: '2026-09-04', status: 'PENDING', createdAt: 1, updatedAt: 1,
   }));
   await assertFails(setDoc(doc(resignedDb, 'salary_advances', 'resigned-advance'), {
     userId: 'resigned-test', amount: 100, date: '2026-09-04', status: 'PENDING', createdAt: 1, updatedAt: 1,
   }));
-  await assertSucceeds(setDoc(doc(staffADb, 'salary_advances', 'staff-advance'), {
-    userId: 'staff-a', amount: 100, date: '2026-09-04', status: 'PENDING', createdAt: 1, updatedAt: 1,
+  await assertSucceeds(setDoc(doc(staffADb, 'salary_advances', 'staff-advance'), advanceA));
+  await assertSucceeds(getDoc(doc(staffADb, 'salary_advances', 'staff-advance')));
+  await assertFails(getDoc(doc(staffBDb, 'salary_advances', 'staff-advance')));
+  await assertFails(updateDoc(doc(staffADb, 'salary_advances', 'staff-advance'), { status: 'APPROVED', updatedAt: 2 }));
+
+  // Admin can approve/reject payroll requests.
+  await assertSucceeds(updateDoc(doc(adminDb, 'salary_advances', 'staff-advance'), { status: 'APPROVED', updatedAt: 2 }));
+  await assertSucceeds(getDoc(doc(adminDb, 'salary_advances', 'staff-advance')));
+
+  // Audit events are admin-created/admin-readable and immutable afterwards.
+  const auditEvent = {
+    actorUid: 'admin-test',
+    actorRole: 'ADMIN',
+    action: 'ADVANCE_APPROVED',
+    targetCollection: 'salary_advances',
+    targetId: 'staff-advance',
+    targetUserId: 'staff-a',
+    previous: { status: 'PENDING', amount: 100 },
+    next: { status: 'APPROVED', amount: 100 },
+    occurredAt: 2,
+    createdAt: 2,
+  };
+  await assertFails(setDoc(doc(staffADb, 'payroll_audit_events', 'audit-staff-denied'), auditEvent));
+  await assertSucceeds(setDoc(doc(adminDb, 'payroll_audit_events', 'audit-approved'), auditEvent));
+  await assertSucceeds(getDoc(doc(adminDb, 'payroll_audit_events', 'audit-approved')));
+  await assertFails(getDoc(doc(staffADb, 'payroll_audit_events', 'audit-approved')));
+  await assertFails(updateDoc(doc(adminDb, 'payroll_audit_events', 'audit-approved'), { createdAt: 3 }));
+  await assertFails(deleteDoc(doc(adminDb, 'payroll_audit_events', 'audit-approved')));
+
+  // Owner can cancel own pending request, but not an approved one.
+  await assertSucceeds(setDoc(doc(staffADb, 'salary_advances', 'cancel-pending'), {
+    ...advanceA,
+    amount: 150,
   }));
+  await assertSucceeds(deleteDoc(doc(staffADb, 'salary_advances', 'cancel-pending')));
+  await assertFails(deleteDoc(doc(staffADb, 'salary_advances', 'staff-advance')));
 
   await assertSucceeds(getDoc(doc(staffADb, 'bills', 'bill-a')));
 
-  console.log('Firestore emulator authorization checks passed.');
+  console.log('Firestore emulator authorization and payroll audit checks passed.');
 } finally {
   await testEnv.cleanup();
 }
