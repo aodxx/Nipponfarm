@@ -43,6 +43,17 @@
 | `NIPON-AI-01` | AI Integration | ตรวจ Gemini readiness, provider initialization, model, error codes และ safe responses | `verify/gemini-integration` | `Blocked` | รอ test-only Gemini credential และ Preview environment | `docs/verification-packet/` |
 | `NIPON-SEC-01` | Security Reviewer | ตรวจ secrets, authorization, ownership, dependency และ data-loss risk | `security/<task-name>` | `Planned` | — | `KNOWN_ISSUES.md` |
 | `NIPON-DOC-01` | Documentation | ดูแล status, architecture, test report, known issues, next actions และ handoff | `docs/<task-name>` | `In Progress` | ดูแลเอกสารตามผล verification | `CURRENT_STATUS.md` |
+| `NIPON-PROD-01` | Product Owner | ยืนยัน business priority, acceptance criteria, production impact และ go/no-go decision | `product/<task-name>` | `Planned` | — | `PROJECT_STATUS.md` |
+| `NIPON-UX-01` | UX / Field Workflow | ตรวจ usability, Thai copy, mobile layout, offline expectations และ workflow ภาคสนาม | `ux/<task-name>` | `Planned` | — | `NIPPONFARM_CORE_WORKFLOW_UX_CONSOLIDATION.md` |
+| `NIPON-QA-01` | QA / E2E Tester | ออกแบบ acceptance matrix, regression, browser/device checks และ defect reproduction | `qa/<task-name>` | `Planned` | — | `docs/CORE_WORKFLOW_VERIFICATION_MATRIX.md` |
+| `NIPON-DATA-01` | Data Steward | ตรวจ schema, migration, backup, reconciliation, retention และ data-quality evidence | `data/<task-name>` | `Blocked` | รอ isolated Firebase project และ backup scope | `docs/verification-packet/` |
+| `NIPON-DEVOPS-01` | DevOps / Release | ดูแล CI, Vercel project, preview/production promotion, rollback และ deployment evidence | `ops/<task-name>` | `Planned` | — | `docs/PRODUCTION_DEPLOYMENT_RUNBOOK.md` |
+| `NIPON-SRE-01` | SRE / Observability | ตรวจ health, runtime logs, error budget, incident response และ recovery drill | `sre/<task-name>` | `Planned` | — | `TEST_REPORT.md` |
+| `NIPON-AUTH-01` | Identity & Access | ตรวจ Firebase Auth providers, role lifecycle, token verification และ account recovery | `security/auth-<task-name>` | `Planned` | — | `server/firebaseAuth.ts` |
+| `NIPON-RULES-01` | Firebase Rules Reviewer | ทบทวน Firestore/Storage rules, owner boundary, emulator tests และ rollback | `security/rules-<task-name>` | `Blocked` | รอ test project; ห้ามแก้ production rules | `firestore.rules`, `storage.rules` |
+| `NIPON-INT-01` | Integration Operator | ดูแล test-only SMTP, Gemini, R2/ImageKit, Cron destinations และ cleanup | `verify/integrations-<task-name>` | `Blocked` | รอ isolated credentials/destinations | `docs/verification-packet/` |
+| `NIPON-RELEASE-01` | Release Reviewer | ตรวจ diff, checks, PR approval, release notes และ post-deploy smoke evidence | `release/<task-name>` | `Planned` | — | `.github/workflows/verify.yml` |
+| `NIPON-SUPPORT-01` | Operations / Support | รวบรวม defect จากผู้ใช้, reproduce, triage และติดตาม communication | `support/<task-name>` | `Planned` | — | `KNOWN_ISSUES.md` |
 
 ## Scope ownership rules
 
@@ -90,7 +101,7 @@ security: verify owner boundary for maintenance records
 
 ## Current coordination notes
 
-ขณะสร้างทะเบียนนี้ repository baseline คือ commit `fba7c2d` บน `main`. Audit และ Verification Packet ถูกเก็บใน branch `audit/recovery-baseline-2026-09-04` เพื่อไม่ปะปนกับ `main` และยังไม่มีการ push หรือ deploy จาก branch นี้
+ขณะอัปเดตทะเบียนนี้ repository `main` รวม PR #9 แล้วที่ merge commit `d2b7b43`. Audit และ Verification Packet ถูก push ขึ้น branch `audit/recovery-baseline-2026-09-04` และ PR ถูก merge แล้ว; การ deploy production ยังไม่ถูกสั่งโดย Agent นี้
 
 สถานะที่ต้องถือเป็นข้อจำกัดร่วมของทุก Agent คือ production ยังอยู่ในระยะ migration validation, Gemini health ยังเป็น `AI_NOT_CONFIGURED`, Firebase test project ยังไม่ถูกสร้างใน packet นี้ และยังไม่มีสิทธิ์ให้ทำ production CRUD, rules deployment, migration, credential rotation หรือ deletion
 
@@ -99,3 +110,4 @@ security: verify owner boundary for maintenance records
 | Date (UTC) | Agent | Change | Evidence |
 |---|---|---|---|
 | 2026-09-04 | `NIPON-AUDIT-01` | สร้างทะเบียน Agent และกำหนด roster เริ่มต้น | `AGENT_REGISTRY.md` |
+| 2026-09-04 | `NIPON-AUDIT-01` | เพิ่ม Product, UX, QA, Data, DevOps, SRE, Auth, Rules, Integration, Release และ Support roles | `AGENT_REGISTRY.md` |
