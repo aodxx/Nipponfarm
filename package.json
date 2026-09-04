@@ -9,7 +9,7 @@
     "vercel-build": "vite build",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist",
-    "test:auth": "tsx --test server/authorizationPolicy.test.ts server/aiErrors.test.ts src/lib/billIdempotency.test.ts",
+    "test:auth": "tsx --test server/authorizationPolicy.test.ts server/aiErrors.test.ts server/firestoreRulesPolicy.test.ts src/lib/billIdempotency.test.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
