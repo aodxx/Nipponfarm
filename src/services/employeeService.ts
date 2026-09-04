@@ -3,7 +3,7 @@ import { db, auth } from '../lib/firebase';
 import { SalaryAdvance, EmployeeBaseSalary, EmployeeTransaction } from '../types';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { OperationType, handleFirestoreError } from '../lib/firestore-error';
-import { assertNoDuplicateAdvanceSubmission, DuplicateAdvanceSubmissionError, getAdvanceSubmissionKey } from '../lib/payrollUtils';
+import { assertNoDuplicateAdvanceSubmission, DuplicateAdvanceSubmissionError, getAdvanceSubmissionKey, getAdvanceWriteMode } from '../lib/payrollUtils';
 import { buildPayrollAuditEvent, PayrollAuditInput } from '../lib/payrollAudit';
 
 const SALARY_ADVANCES_COLLECTION = 'salary_advances';
@@ -21,6 +21,7 @@ export const addAdvance = async (amount: number, date: string) => {
   try {
     const submissionKey = getAdvanceSubmissionKey({ userId, amount, date });
     const deterministicRef = doc(db, SALARY_ADVANCES_COLLECTION, submissionKey);
+    const newAdvanceRef = doc(collection(db, SALARY_ADVANCES_COLLECTION));
     const existingSnapshot = await getDocs(query(
       collection(db, SALARY_ADVANCES_COLLECTION),
       where('userId', '==', userId),
@@ -43,16 +44,17 @@ export const addAdvance = async (amount: number, date: string) => {
         updatedAt: now,
       };
       if (deterministicSnapshot.exists()) {
-        assertNoDuplicateAdvanceSubmission(
-          [{ id: deterministicSnapshot.id, ...deterministicSnapshot.data() } as SalaryAdvance],
-          { userId, amount, date },
-        );
-        transaction.set(deterministicRef, data);
+        const existingDeterministic = { id: deterministicSnapshot.id, ...deterministicSnapshot.data() } as SalaryAdvance;
+        const writeMode = getAdvanceWriteMode(existingDeterministic);
+        if (writeMode === 'DUPLICATE') {
+          assertNoDuplicateAdvanceSubmission([existingDeterministic], { userId, amount, date });
+        }
+        transaction.set(writeMode === 'CREATE_NEW' ? newAdvanceRef : deterministicRef, data);
       } else {
         const rejectedLegacy = existingSnapshot.docs.find((advanceDoc) => advanceDoc.data().status === 'REJECTED');
         if (rejectedLegacy) {
-          transaction.update(rejectedLegacy.ref, data);
-          return rejectedLegacy.id;
+          transaction.set(newAdvanceRef, data);
+          return newAdvanceRef.id;
         }
         transaction.set(deterministicRef, data);
       }
