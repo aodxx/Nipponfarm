@@ -164,6 +164,7 @@ export default function ScanReceipt() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [showAllReviewItems, setShowAllReviewItems] = useState(false);
   const [historicalDescriptions, setHistoricalDescriptions] = useState<string[]>([]);
   const [historicalVendors, setHistoricalVendors] = useState<string[]>([]);
 
@@ -660,6 +661,7 @@ export default function ScanReceipt() {
 
   const reset = () => {
     setSaveComplete(false);
+    setShowAllReviewItems(false);
     setCapturedImage(null);
     setAnalysisResult(null);
     setAnalysisError(null);
@@ -1112,7 +1114,7 @@ export default function ScanReceipt() {
                   )}
                 </div>
 
-                {editableItems.map((item, idx) => (
+                {editableItems.slice(0, showAllReviewItems ? editableItems.length : 3).map((item, idx) => (
                   <motion.div 
                     layout
                     key={idx} 
@@ -1217,6 +1219,19 @@ export default function ScanReceipt() {
                   </motion.div>
                 ))}
 
+                {editableItems.length > 3 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllReviewItems((value) => !value)}
+                    className="w-full min-h-11 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-600 transition active:scale-[0.99] dark:border-white/10 dark:bg-white/5 dark:text-white/70"
+                    aria-expanded={showAllReviewItems}
+                  >
+                    {showAllReviewItems
+                      ? 'ย่อรายการสินค้า'
+                      : `ดูทั้งหมดอีก ${editableItems.length - 3} รายการ`}
+                  </button>
+                )}
+
                 <div className="pt-4 mt-4 border-t border-slate-100 dark:border-white/5">
                    <div className="flex justify-between items-center mb-2">
                       <span className="text-xs font-black text-slate-400 uppercase tracking-widest">ผลรวมคำนวณจริง</span>
@@ -1259,12 +1274,15 @@ export default function ScanReceipt() {
               </div>
 
               {analysisResult.analysisNote && (
-                <div className="bg-slate-50 dark:bg-white/5 p-4 rounded-2xl border border-slate-100 dark:border-white/5">
-                  <p className="text-[10px] text-slate-400 dark:text-white/30 uppercase font-black mb-1">AI Note</p>
-                  <p className="text-xs italic text-slate-600 dark:text-white/60 leading-relaxed font-medium">
+                <details className="group rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/5">
+                  <summary className="cursor-pointer list-none text-sm font-bold text-slate-600 dark:text-white/65">
+                    รายละเอียดจาก AI
+                    <span className="ml-2 text-xs text-slate-400 group-open:hidden">แตะเพื่อดู</span>
+                  </summary>
+                  <p className="mt-3 text-xs italic leading-relaxed text-slate-600 dark:text-white/60">
                     "{analysisResult.analysisNote}"
                   </p>
-                </div>
+                </details>
               )}
 
               {/* Grand Red Mismatch Warning UI Overlay */}
@@ -1346,7 +1364,7 @@ export default function ScanReceipt() {
                   ) : (
                     <Save className="w-5 h-5"/>
                   )}
-                  {isSaving ? "กำลังบันทึก..." : isTotalMatching ? "บันทึกข้อมูล" : "บันทึกข้อมูล"}
+                  {isSaving ? "กำลังบันทึก..." : "ยืนยันและบันทึกรายจ่าย"}
                 </button>
               </div>
             </motion.div>
