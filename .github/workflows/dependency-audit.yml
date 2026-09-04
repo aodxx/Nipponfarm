@@ -1,0 +1,50 @@
+name: Dependency Audit Inventory
+
+on:
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/dependency-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit-inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Capture npm audit JSON
+        shell: bash
+        run: |
+          npm audit --json > dependency-audit.json || true
+      - name: Print critical/high inventory
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const audit = JSON.parse(fs.readFileSync('dependency-audit.json', 'utf8'));
+          const counts = audit.metadata?.vulnerabilities || {};
+          console.log('AUDIT_COUNTS', JSON.stringify(counts));
+          const vulnerabilities = audit.vulnerabilities || {};
+          const rows = Object.entries(vulnerabilities)
+            .filter(([, v]) => ['critical', 'high'].includes(v.severity))
+            .map(([name, v]) => ({
+              name,
+              severity: v.severity,
+              direct: Boolean(v.isDirect),
+              range: v.range,
+              fixAvailable: v.fixAvailable,
+              via: (v.via || []).map(x => typeof x === 'string' ? x : `${x.name}: ${x.title}`).slice(0, 5),
+              effects: (v.effects || []).slice(0, 10),
+            }))
+            .sort((a, b) => (a.severity === b.severity ? a.name.localeCompare(b.name) : a.severity === 'critical' ? -1 : 1));
+          console.log('AUDIT_CRITICAL_HIGH_BEGIN');
+          console.log(JSON.stringify(rows, null, 2));
+          console.log('AUDIT_CRITICAL_HIGH_END');
+          NODE
