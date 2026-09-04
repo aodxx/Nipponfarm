@@ -1,37 +1,40 @@
-# Niponfarm System Architecture
+# Nipponfarm System Architecture
 
-อัปเดตผล Audit: **4 กันยายน 2026**. เอกสารนี้สะท้อน implementation และ deployment ที่ตรวจได้จาก repository commit `d2dd516` และ production domain ปัจจุบัน.
+อัปเดตผล Audit: **4 กันยายน 2026**. อ้างอิง commit `fba7c2d8a2aed3217e71c5b18e11c24a1adbfced` และ production `https://nipponfarm.vercel.app`.
 
 ## ภาพรวม
 
-ระบบเป็น React 19 SPA ที่ build ด้วย Vite และ deploy static frontend บน Vercel. HTTP backend ใช้ Express ใน `appServer.ts` และ export ผ่าน `api/index.ts` เป็น Vercel Function. ใน local/standalone mode `start.ts` เริ่ม Node HTTP server และ WebSocket bridge แยกต่างหาก.
+ระบบเป็น React 19 SPA ที่ build ด้วย Vite และ deploy frontend/API บน Vercel. Frontend ใช้ Firebase SDK เชื่อม Auth, Firestore และ Storage โดยตรง. Backend ใช้ Express ใน `appServer.ts` และ export เป็น Vercel Function ผ่าน `api/index.ts`; standalone Node server ใน `start.ts` เพิ่ม WebSocket `/live` และ cron ในกรณีที่รันนอก Vercel.
 
-| ส่วน | Implementation ปัจจุบัน | สถานะจาก Audit |
-| --- | --- | --- |
+| ส่วน | Implementation ปัจจุบัน | สถานะ Audit |
+|---|---|---|
 | Frontend | React 19, TypeScript, Vite, Tailwind, PWA | Build ผ่าน; production page 200 |
-| Backend/API | Express, `api/index.ts`, `appServer.ts` | Health และ validation routes ตอบได้; integration ยังไม่ครบ |
-| Authentication | Firebase Auth client; server ตรวจ Firebase ID token ใน AI routes | AI unauthenticated ถูกปฏิเสธ; routes อื่นบางตัวต้อง review |
-| Database | Firebase Firestore client direct sync | Rules อ่านผ่านการตรวจ static; CRUD จริงยัง NOT RUN |
-| Storage | Firebase Storage client; optional ImageKit gateway | Rules กว้างในบาง path; upload จริงยัง NOT RUN |
-| AI provider | Gemini ผ่าน `server/aiProvider.ts` | Provider = gemini; `aiReady=false` production |
-| Video | Cloudflare R2 presigned URLs | Credentials และ end-to-end upload ยังไม่ยืนยัน |
-| Email | Nodemailer SMTP หรือ simulation fallback | SMTP ยังไม่ยืนยัน |
-| Hosting | Vercel production `nipponfarm.vercel.app` | Page/health ผ่าน; logs ยังไม่ตรวจ |
-| Scheduling | Vercel Cron `0 22 * * *` → 05:00 Asia/Bangkok | Unauthorized test 401; successful run ยังไม่ยืนยัน |
-| Live AI | Standalone `ws` server `/live` | ไม่ถูก export ผ่าน Vercel handler; BLOCKED |
-
-## API surface ที่พบ
-
-`GET /api/health`, `GET /api/weather`, `POST /api/receipt-analyze`, `POST /api/text-to-speech`, `POST /api/swine-ai-analyze`, email routes, R2 presign routes, upload gateway, image proxy, cron route และ manual daily-task trigger. AI routes มี `requireFirebaseAuth`; health แยกเป็น `api/health.ts` และ route ใน Express.
+| Routing | React Router, protected/admin route wrappers | Static route guard พบ; E2E ยังไม่รัน |
+| Authentication | Firebase Auth client; server verifies Firebase ID token | ไม่มี token ถูกปฏิเสธ 401 |
+| Database | Firestore client direct sync | Rules อ่าน static; CRUD จริง NOT RUN |
+| Storage | Firebase Storage; optional ImageKit gateway | Rules บาง path กว้าง; upload NOT RUN |
+| Backend/API | Express, `appServer.ts`, `api/index.ts` | Health/validation ผ่าน; success integrations NOT RUN |
+| AI | Gemini adapter ใน `server/aiProvider.ts` | Provider gemini; production `aiReady:false` |
+| Email | Nodemailer SMTP หรือ simulation fallback | SMTP delivery NOT RUN; simulation ต้องไม่ถือเป็น production delivery |
+| Video | Cloudflare R2 presigned URLs | Credentials/E2E NOT RUN |
+| Hosting | Vercel, build `npm run build`, output `dist` | Homepage/health ผ่าน |
+| Scheduling | Vercel Cron `/api/cron/daily-tasks`, `0 22 * * *` UTC | Unauthorized 401; successful run NOT RUN |
+| Live AI | `ws` ใน standalone server | BLOCKED on current Vercel handler |
 
 ## Data flow
 
-ผู้ใช้เปิด PWA จาก Vercel → React ใช้ Firebase SDK เชื่อม Firebase Auth/Firestore/Storage โดยตรง → เรียก Express API สำหรับ weather, AI, email, R2 และ proxy → server ใช้ server-only environment variables ติดต่อ Gemini, SMTP, ImageKit หรือ R2. GitHub Actions ตรวจ `npm ci`, TypeScript lint และ production build.
+ผู้ใช้เปิด PWA จาก Vercel → React route/auth guard → Firebase Auth/Firestore/Storage โดยตรงสำหรับข้อมูลหลัก → Express API สำหรับ weather, AI, email, R2 และ upload proxy → server ใช้ environment variables ติดต่อ external providers. GitHub Actions รัน `npm ci`, `npm run test:auth`, `npm run lint` และ `npm run build` เมื่อ push หรือ pull request.
 
-## Security boundaries ที่ตรวจพบ
+## Security boundaries
 
-Firebase public web configuration ถูกอ่านจาก `VITE_FIREBASE_*` ซึ่งเป็น identifier ที่ browser ต้องเห็น. Gemini, SMTP, ImageKit private key, R2 secret และ cron secret อยู่ใน server environment ตามแบบที่เอกสารกำหนด. อย่างไรก็ตาม email routes, upload gateway และ manual trigger ยังไม่ติด middleware auth ใน `appServer.ts`; R2 ใช้ `userId` จาก request body เพื่อตรวจ role แทนการผูกกับ verified token. ประเด็นนี้เป็น P0 และยังไม่ควรถือว่า boundary ปลอดภัย.
+Firebase web config เป็น public browser identifier และอ่านจาก `VITE_FIREBASE_*`; Gemini, SMTP, ImageKit private key, R2 secret และ cron secret ต้องอยู่ server environment. AI routes และ integration routes ที่ตรวจล่าสุดใช้ Firebase ID-token middleware. R2 ตรวจ active user, body UID และ key/content type policy.
 
-## Known documentation mismatch
+ข้อจำกัดที่ยังเปิดอยู่คือ Firestore/Storage rules บาง collection/path อนุญาต active/signed-in users กว้างกว่าขอบเขต farm/owner ที่ควรเป็น และ `r2Service.ts` โหลด Firebase runtime config ระหว่าง module initialization ซึ่งทำให้ standalone startup ล้มเหลวเมื่อ env ไม่ครบ.
 
-`TECHNICAL_DOCUMENTATION.md` ระบุ Google Cloud Run และ Nginx เป็น infrastructure หลัก แต่ README, `vercel.json`, `api/index.ts` และ production response แสดงว่า current deployment เป็น Vercel. เอกสารเดิมควรได้รับการแก้ในงานถัดไปหลัง security baseline ไม่ควรใช้ Cloud Run description เป็นหลักฐาน deployment ปัจจุบัน.
+## Deployment limitation
+
+`api/index.ts` export เฉพาะ HTTP Express app. WebSocket upgrade handler ถูกสร้างใน `startStandaloneServer()` เท่านั้น จึงไม่ควรนับ `/live` ว่ารองรับบน Vercel. ทางเลือกต้องทำเป็นงานออกแบบแยก เช่น HTTP streaming/SSE หรือ runtime ที่รองรับ connection ระยะยาว.
+
+## Documentation mismatch
+
+`TECHNICAL_DOCUMENTATION.md` ยังอธิบาย Cloud Run/Nginx เป็น infrastructure หลัก ขณะที่ `vercel.json`, `api/index.ts` และ production response ยืนยันว่า deployment ปัจจุบันคือ Vercel. เอกสารเดิมควรแก้ใน documentation task แยกหลัง security/integration baseline.
