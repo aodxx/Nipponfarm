@@ -1,7 +1,8 @@
-import { collection, addDoc, onSnapshot, query, orderBy, doc, getDoc, deleteDoc, getDocs, limit } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, getDoc, deleteDoc, getDocs, limit, where, runTransaction } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { PigSale } from '../types';
 import { OperationType, handleFirestoreError } from '../lib/firestore-error';
+import { getPigSaleDocumentId } from '../lib/pigSaleIdempotency';
 
 const PIG_SALES_COLLECTION = 'pig_sales';
 
@@ -41,19 +42,35 @@ export const getRecentBuyers = async (): Promise<{name: string, email: string, v
 export const savePigSale = async (saleData: Omit<PigSale, 'id' | 'userId' | 'createdAt'>, recordedBy: string) => {
   const userId = getCurrentUserId();
   try {
-    const docRef = await addDoc(collection(db, PIG_SALES_COLLECTION), {
-      ...saleData,
-      recordedBy,
-      userId,
-      createdAt: Date.now()
+    // Compatibility check for records created before deterministic sale document IDs.
+    const legacyMatch = await getDocs(query(
+      collection(db, PIG_SALES_COLLECTION),
+      where('userId', '==', userId),
+      where('saleId', '==', saleData.saleId),
+      limit(1),
+    ));
+    if (!legacyMatch.empty) return legacyMatch.docs[0].id;
+
+    const deterministicId = getPigSaleDocumentId({ userId, saleId: saleData.saleId });
+    const saleRef = doc(db, PIG_SALES_COLLECTION, deterministicId);
+
+    return await runTransaction(db, async (transaction) => {
+      const existing = await transaction.get(saleRef);
+      if (existing.exists()) return saleRef.id;
+
+      transaction.set(saleRef, {
+        ...saleData,
+        recordedBy,
+        userId,
+        createdAt: Date.now()
+      });
+      return saleRef.id;
     });
-    return docRef.id;
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, PIG_SALES_COLLECTION);
+    throw error;
   }
 };
-
-
 
 export const subscribeToPigSales = (callback: (sales: PigSale[]) => void) => {
   const q = query(collection(db, PIG_SALES_COLLECTION), orderBy('createdAt', 'desc'));
@@ -80,4 +97,3 @@ export const deletePigSale = async (id: string) => {
     handleFirestoreError(error, OperationType.DELETE, `${PIG_SALES_COLLECTION}/${id}`);
   }
 };
-
