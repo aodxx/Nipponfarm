@@ -40,14 +40,12 @@ try {
     uploadBytes(ref(staffA, 'bills/staff-a/not-image.txt'), image, { contentType: 'text/plain' }),
   );
 
-  const legacyMaintenanceRef = ref(staffA, 'maintenance/maintenance-a.webp');
-  await assertSucceeds(
-    uploadBytes(legacyMaintenanceRef, image, { contentType: 'image/webp' }),
+  await assertFails(
+    uploadBytes(ref(staffA, 'maintenance/maintenance-a.webp'), image, { contentType: 'image/webp' }),
   );
   await assertFails(
     uploadBytes(ref(staffB, 'maintenance/maintenance-a.webp'), updatedImage, { contentType: 'image/webp' }),
   );
-  await assertFails(deleteObject(legacyMaintenanceRef));
 
   const ownerMaintenanceRef = ref(staffA, 'maintenance/staff-a/maintenance-owned.webp');
   await assertSucceeds(

@@ -29,11 +29,11 @@ service firebase.storage {
       allow delete: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // Legacy flat maintenance/<file> uploads remain compatible with the current client.
-    // Explicitly require no existing object so a legacy path is create-once and immutable.
+    // Legacy flat maintenance/<file> objects remain readable for historical records.
+    // New uploads, updates, and deletes must use owner-scoped maintenance/<uid>/... paths.
     match /maintenance/{legacyFile} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && resource == null && isSafeImage(10 * 1024 * 1024);
+      allow write: if false;
     }
 
     match /avatars/{userId}/{allPaths=**} {
