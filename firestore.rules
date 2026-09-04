@@ -25,6 +25,9 @@ service cloud.firestore {
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
+    function ownerIsUnchanged() {
+      return incoming().userId == existing().userId;
+    }
     function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
 
     // [VALIDATION BOILERPLATE]
@@ -130,12 +133,9 @@ service cloud.firestore {
     match /news_posts/{postId} {
       allow list: if isSignedIn();
       allow get: if isSignedIn();
-      
       allow create: if isAdmin() && isValidNewsPost(incoming()) && incoming().userId == request.auth.uid;
-      
       allow update: if (isAdmin() && isValidNewsPost(incoming())) || 
                     (isSignedIn() && incoming().diff(existing()).affectedKeys().hasOnly(['likedBy']));
-      
       allow delete: if isAdmin();
     }
 
@@ -166,7 +166,9 @@ service cloud.firestore {
     match /maintenance_requests/{documentId} { 
       allow read: if isActiveUser();
       allow create: if isActiveUser() && isValidMaintenance(incoming()) && incoming().userId == request.auth.uid;
-      allow update: if isActiveUser() && (isAdmin() || (isOwner(existing().userId) && isValidMaintenance(incoming())));
+      allow update: if isActiveUser() && isValidMaintenance(incoming()) && (
+        isAdmin() || (isOwner(existing().userId) && ownerIsUnchanged())
+      );
       allow delete: if isAdmin();
     }
     
@@ -174,22 +176,22 @@ service cloud.firestore {
     match /chat_rooms/{documentId} { allow read, write: if isActiveUser(); }
     match /chat_messages/{documentId} { allow read, write: if isActiveUser(); }
     
-    // Payroll (Strictly Admin for most, but staff can read own and request advance)
+    // Payroll (Strictly Admin for most, but active staff can read own and request advance)
     match /employee_transactions/{documentId} { allow read, write: if isAdmin(); }
     match /EmployeeTransaction/{documentId} { allow read, write: if isAdmin(); }
     match /employee_salaries/{documentId} { 
-      allow read: if isAdmin() || (isSignedIn() && documentId == request.auth.uid);
+      allow read: if isAdmin() || (isActiveUser() && documentId == request.auth.uid);
       allow write: if isAdmin();
     }
     match /payroll_slips/{documentId} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow read: if isAdmin() || (isActiveUser() && resource.data.userId == request.auth.uid);
       allow write: if isAdmin();
     }
     match /salary_advances/{documentId} {
-      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
-      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isActiveUser() && incoming().userId == request.auth.uid;
+      allow read: if isAdmin() || (isActiveUser() && resource.data.userId == request.auth.uid);
       allow update: if isAdmin();
-      allow delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid && existing().status == 'PENDING');
+      allow delete: if isAdmin() || (isActiveUser() && resource.data.userId == request.auth.uid && existing().status == 'PENDING');
     }
     match /payroll_audit_events/{documentId} {
       allow read: if isAdmin();
@@ -200,13 +202,17 @@ service cloud.firestore {
     match /bills/{documentId} { 
       allow read: if isActiveUser();
       allow create: if isActiveUser() && isValidBill(incoming()) && incoming().userId == request.auth.uid;
-      allow update: if isActiveUser() && isValidBill(incoming()) && (incoming().userId == request.auth.uid || isAdmin());
+      allow update: if isActiveUser() && isValidBill(incoming()) && (
+        isAdmin() || (isOwner(existing().userId) && ownerIsUnchanged())
+      );
       allow delete: if isAdmin();
     }
     match /bill_items/{documentId} { 
       allow read: if isActiveUser();
       allow create: if isActiveUser() && isValidBillItem(incoming()) && incoming().userId == request.auth.uid;
-      allow update: if isActiveUser() && isValidBillItem(incoming()) && (incoming().userId == request.auth.uid || isAdmin());
+      allow update: if isActiveUser() && isValidBillItem(incoming()) && (
+        isAdmin() || (isOwner(existing().userId) && ownerIsUnchanged())
+      );
       allow delete: if isAdmin();
     }
 
@@ -219,7 +225,9 @@ service cloud.firestore {
     match /pig_prices/{documentId} {
       allow read: if isActiveUser();
       allow create: if isActiveUser() && isValidPigPrice(incoming()) && incoming().userId == request.auth.uid;
-      allow update: if isActiveUser() && isValidPigPrice(incoming()) && (incoming().userId == request.auth.uid || isAdmin());
+      allow update: if isActiveUser() && isValidPigPrice(incoming()) && (
+        isAdmin() || (isOwner(existing().userId) && ownerIsUnchanged())
+      );
       allow delete: if isAdmin();
     }
     match /historical_pig_prices/{documentId} {
