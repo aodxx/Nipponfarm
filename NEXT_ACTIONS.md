@@ -1,40 +1,117 @@
 # Niponfarm Next Actions
 
-ลำดับนี้จัดทำจาก Audit วันที่ **4 กันยายน 2026** โดยยึดหลักรักษาระบบเดิมและไม่ทำ destructive migration.
+อัปเดต: **4 กันยายน 2026**
 
-## P0 — ต้องแก้ก่อน
+> แผนงานหลักช่วงถัดไปให้อ้างอิง `NIPPONFARM_CORE_WORKFLOW_UX_CONSOLIDATION.md` เป็นเอกสารกลางสำหรับงาน Consolidation ทั้งระบบ
 
-1. **Secure server endpoints ก่อนเปิด integrations**: เพิ่ม Firebase ID-token verification และ role/ownership authorization ให้ email, upload gateway, R2 presign และ manual trigger; ห้ามเชื่อ `userId` จาก request body เป็นตัวตัดสินสิทธิ์เพียงอย่างเดียว.
-2. เพิ่ม input schema validation, content-type/size limits, rate limiting และ error responses ที่ไม่เผย `err.message`, token, email หรือข้อมูลเงินเดือนเกินจำเป็น.
-3. สร้าง test cases สำหรับ unauthenticated, wrong-user, pending user, staff และ admin โดยใช้ mock/emulator หรือ test project ไม่ใช้ production data.
-4. หลังแก้ให้รัน `npm run lint`, `npm run build`, API smoke tests และ review diff ก่อนเปิด PR.
-5. ตรวจ inventory/backup ของ Firebase project `Thailottery` และ credentials ที่เคยเผยแพร่ก่อนเปลี่ยน rules หรือ rotate/revoke.
+## สถานะสำคัญ
 
-## P1 — สำคัญ
+- งาน server endpoint authorization baseline ถูกดำเนินการและ merge แล้ว
+- ห้ามกลับไปทำงาน P0 เดิมซ้ำโดยไม่ตรวจ commit ล่าสุด
+- งานถัดไปต้องเปลี่ยนจาก “เพิ่มฟีเจอร์” ไปเป็น “พิสูจน์ workflow หลัก + ลดความซับซ้อน + ทำระบบให้ใช้งานจริงได้ครบวงจร”
 
-1. ตั้งและยืนยัน `GEMINI_API_KEY`, model variables, SMTP, `CRON_SECRET`, ImageKit/R2 ใน Vercel ตาม environment ที่ถูกต้อง แล้วทดสอบ success/error path พร้อมหลักฐาน.
-2. ตรวจ Vercel build/runtime logs และเพิ่ม structured request ID/error reporting ที่ไม่เก็บ secret หรือ PII.
-3. ทำ Firestore/Storage CRUD และ authorization tests ด้วย test account/data isolation; ห้ามใช้ test record ใน collection ที่อาจเป็น shared production โดยไม่มี cleanup proof.
-4. ตัดสินใจ transport สำหรับ Live AI บน Vercel: SSE/HTTP streaming หรือแยก WebSocket runtime; ต้องมี auth, timeout และ reconnect test.
-5. ทบทวน Storage/Firestore rules ให้ least privilege หลัง inventory และ emulator review.
-6. แก้ dependency vulnerabilities อย่างเป็นลำดับ โดยเริ่ม critical/high ที่มี fix และตรวจ compatibility; `xlsx` ต้องมีทางเลือกหรือ risk acceptance เพราะไม่มี automatic fix.
-7. แยก route chunks และลด main bundle หลังมี baseline mobile performance.
+## P0 — Production & Integration Verification
 
-## P2 — ปรับปรุงภายหลัง
+1. ยืนยัน `GEMINI_API_KEY` และทำให้ production health รายงาน `aiReady: true`
+2. ทดสอบ Gemini success path จริงอย่างน้อย 1 workflow ด้วย test account/data
+3. ทำ Firestore CRUD test: create/read/update/delete ด้วย test record ที่แยกจากข้อมูลจริง
+4. ทำ Firebase Storage upload/download/delete test
+5. ตรวจ authorization ของ role หลัก: unauthenticated, pending, staff, admin และ wrong-owner
+6. ยืนยัน SMTP, `CRON_SECRET`, ImageKit/R2 และ server-only environment variables ตามที่ใช้งานจริง
+7. ตรวจ Vercel runtime logs หลังเรียก API สำคัญ
+8. ตรวจ Firebase project `Thailottery` inventory/backup/reconciliation ก่อนเปลี่ยน rules หรือ migration
 
-1. ปรับ `TECHNICAL_DOCUMENTATION.md` ให้ตรงกับ Vercel architecture และระบุ standalone WebSocket เป็นข้อจำกัด.
-2. ทำ PWA install/offline/update/relogin acceptance test บน Android และเครือข่ายจำกัด.
-3. เปลี่ยน package metadata จาก `react-example`/`0.0.0` เมื่อกำหนด release policy แล้ว.
-4. เพิ่ม automated API smoke/security tests ใน CI โดยไม่ใช้ secrets จริง.
+## P1 — Nipponfarm Core Workflow & UX Consolidation
+
+ดำเนินงานตาม `NIPPONFARM_CORE_WORKFLOW_UX_CONSOLIDATION.md`
+
+### Core workflows ที่ต้องพิสูจน์
+
+1. Sow Lifecycle
+2. Receipt → Expense
+3. Pig Sale
+4. Payroll & Advance
+5. Maintenance
+
+### UX / Frontend priorities
+
+- ลด primary navigation ให้เหลือกลุ่มงานหลัก
+- Dashboard ต้องตอบว่า “วันนี้ต้องทำอะไร”
+- refactor `Dashboard.tsx`
+- refactor `ScanReceipt.tsx`
+- แยก large pages อื่นตามลำดับความเสี่ยง
+- เพิ่ม use-case hooks ระหว่าง UI กับ services
+- route-level lazy loading
+- ลด initial bundle
+
+### Data foundation priorities
+
+- ออกแบบ `farmId` strategy
+- permission matrix
+- audit trail สำหรับธุรกรรมสำคัญ
+- ลด hard-coded admin bypass ในระยะยาวโดยมี recovery plan
+
+## P1 — Technical Health
+
+1. แก้ critical/high dependency vulnerabilities แบบมี regression test
+2. ห้ามใช้ `npm audit fix --force` โดยไม่ review
+3. จัดการ `xlsx` ด้วย risk decision หรือ replacement plan หากไม่มี safe fix
+4. ลด main bundle จาก baseline
+5. แก้ import duplication / heavy library loading
+
+## P2 — Field Reliability
+
+1. PWA install/offline/update/relogin acceptance test บน Android จริง
+2. ออกแบบ pending sync state
+3. ทดลอง offline write workflow อย่างน้อย 1 workflow ที่ไม่ใช่การเงิน
+4. unified loading/success/error/retry/sync feedback
+
+## P2 — Business Intelligence
+
+ทำหลัง data quality ผ่านแล้ว:
+
+- รายรับ/รายจ่าย
+- feed cost trend
+- cost per pig
+- sow performance
+- maintenance backlog
+- payroll cost
+- sale price trend
+- farm operating summary
 
 ## NEXT TASK
 
-**งานเดียวที่ควรเริ่มทันที:** สร้าง PR สำหรับ **server endpoint authorization baseline** โดยปิดช่องว่าง auth/ownership ของ email, upload gateway, R2 presign และ manual trigger พร้อม automated tests และรัน lint/build ก่อน review. งานนี้ต้องทำก่อนตั้งค่าและเปิดใช้ Gemini, SMTP หรือ R2 จริง เพราะลดความเสี่ยง abuse และข้อมูลรั่วที่มีผลสูงสุด.
+**Task 1: Core Workflow Verification Baseline**
 
-## Definition of Done ของ Next Task
+สร้าง verification matrix สำหรับ 5 workflow หลัก:
 
-- ทุก route ดังกล่าวตรวจ verified Firebase ID token หรือมี cron secret ตามกรณี.
-- R2 ใช้ UID จาก token ไม่ใช่ค่าที่ผู้เรียกอ้างเอง และมี key/path ownership validation.
-- email/payslip ไม่เปิดให้ส่งไป arbitrary recipient โดยไม่มี role/recipient policy.
-- unauthenticated, wrong-user และ unauthorized role ได้ 401/403 ตามคาด; authorized test ผ่าน.
-- `npm run lint`, `npm run build` และ tests ผ่าน; ไม่มี secret ใน diff.
+1. Sow Lifecycle
+2. Receipt → Expense
+3. Pig Sale
+4. Payroll & Advance
+5. Maintenance
+
+แต่ละ workflow ต้องมี:
+
+- entry point
+- page/component
+- service/API
+- Firestore/Storage collection
+- user roles
+- happy path
+- failure path
+- permission test
+- reload/relogin persistence
+- mobile usability
+- blocker ปัจจุบัน
+
+จากนั้นจัดอันดับ blocker และเลือก workflow ที่เสี่ยงสูงสุดเป็น implementation task ถัดไป
+
+## Definition of Done ของ Task 1
+
+- verification matrix ครบทั้ง 5 workflow
+- ระบุ PASS / PARTIAL / FAIL / NOT TESTED
+- มี blocker และ owner/action ของแต่ละปัญหา
+- ไม่มีการเพิ่ม feature ใหม่ใน task นี้
+- `PROJECT_STATUS.md`, `NEXT_ACTIONS.md`, `KNOWN_ISSUES.md` ต้องอัปเดตให้ตรงกับผลตรวจ
+- lint/build/tests ที่เกี่ยวข้องต้องผ่านก่อนสรุป task
