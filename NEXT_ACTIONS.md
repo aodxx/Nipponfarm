@@ -81,9 +81,9 @@
 
 ## NEXT TASK
 
-**Task 1: Core Workflow Verification Baseline**
+**Task 1: Core Workflow Verification Baseline — เสร็จแล้วในระดับเอกสาร/static verification**
 
-สร้าง verification matrix สำหรับ 5 workflow หลัก:
+สร้าง verification matrix สำหรับ 5 workflow หลักไว้ที่ `docs/CORE_WORKFLOW_VERIFICATION_MATRIX.md`:
 
 1. Sow Lifecycle
 2. Receipt → Expense
@@ -105,13 +105,22 @@
 - mobile usability
 - blocker ปัจจุบัน
 
-จากนั้นจัดอันดับ blocker และเลือก workflow ที่เสี่ยงสูงสุดเป็น implementation task ถัดไป
+ผลการจัดอันดับเลือก **Payroll & Advance** เป็น workflow ที่มี blocker สูงสุดและเป็น implementation task ถัดไป เนื่องจากเป็นธุรกรรมการเงิน มี approval/payslip หลายขั้น และยังขาด audit trail, regression tests และ production permission evidence
 
 ## Definition of Done ของ Task 1
 
-- verification matrix ครบทั้ง 5 workflow
-- ระบุ PASS / PARTIAL / FAIL / NOT TESTED
-- มี blocker และ owner/action ของแต่ละปัญหา
-- ไม่มีการเพิ่ม feature ใหม่ใน task นี้
-- `PROJECT_STATUS.md`, `NEXT_ACTIONS.md`, `KNOWN_ISSUES.md` ต้องอัปเดตให้ตรงกับผลตรวจ
-- lint/build/tests ที่เกี่ยวข้องต้องผ่านก่อนสรุป task
+- [x] verification matrix ครบทั้ง 5 workflow
+- [x] ระบุ PARTIAL / BLOCKED / NOT TESTED ตามหลักฐานที่มี
+- [x] มี blocker และ owner/action ของแต่ละปัญหา
+- [x] ไม่มีการเพิ่ม feature ใหม่ใน task นี้
+- [x] `PROJECT_STATUS.md`, `NEXT_ACTIONS.md`, `KNOWN_ISSUES.md` อัปเดตให้ตรงกับผลตรวจ
+- [x] lint/build/tests ที่เกี่ยวข้องผ่านก่อนสรุป task
+
+## Task 2: Payroll & Advance — Security, Consistency & Audit Baseline
+
+1. เพิ่ม unit tests สูตร advance/payroll และ net salary
+2. กำหนด transaction identity/idempotency สำหรับ request, approval และ payslip
+3. เพิ่ม audit record สำหรับ approve/reject/change โดยไม่เก็บ secret หรือข้อมูลเกินจำเป็น
+4. ตรวจความสอดคล้องของ `EmployeeTransaction` กับ `employee_transactions` โดยไม่ migrate หรือลบข้อมูล production
+5. เพิ่ม integration tests owner/admin/wrong-owner ก่อนแก้ Firestore rules
+6. รัน lint, auth tests และ build ก่อนสรุป

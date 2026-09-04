@@ -33,7 +33,7 @@ Niponfarm อยู่ใน **Phase 0–1: migration validation และ serve
 
 ## Phase decision
 
-ให้คงระบบไว้ที่ **migration validation** และห้ามประกาศ production readiness จนกว่า P0 เรื่อง authorization ของ server endpoints และ P0/P1 integration verification จะผ่าน.
+ให้คงระบบไว้ที่ **migration validation** และห้ามประกาศ production readiness จนกว่า production integration verification, CRUD/permission evidence, runtime logs และ P0/P1 integration verification จะผ่าน. Server endpoint authorization baseline ถูก merge แล้วและอยู่ระหว่างรอ production verification ตาม `KNOWN_ISSUES.md`.
 
 ## สิ่งที่ไม่ได้ทำโดยตั้งใจ
 

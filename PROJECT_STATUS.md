@@ -43,3 +43,20 @@ Nipponfarm แยกซอร์สและวงจร deploy ออกจา�
 4. ตั้ง `APP_URL`, `CRON_SECRET` และ SMTP แล้วทดสอบตามลำดับ
 5. ตัดสินใจ transport ใหม่สำหรับ Live AI บน Vercel
 6. สำรอง Firebase project เดิมก่อนเริ่มแยก project
+
+
+## Core Workflow Verification Baseline — 4 กันยายน 2026
+
+Task 1 เสร็จในระดับเอกสารและ static code verification โดยยังไม่มีการเขียน/แก้/ลบข้อมูล production. สร้าง matrix ครบ 5 workflow ใน `docs/CORE_WORKFLOW_VERIFICATION_MATRIX.md` ผลปัจจุบันคือ Sow Lifecycle, Receipt → Expense, Pig Sale และ Maintenance อยู่ที่ `PARTIAL`; Payroll & Advance อยู่ที่ `BLOCKED / Critical` เพราะเป็นธุรกรรมการเงินที่ยังไม่มี audit trail, สูตรยังไม่มี regression test, ยังไม่มี production CRUD/permission evidence และต้องตรวจความสอดคล้องของ `EmployeeTransaction` กับ `employee_transactions`.
+
+งาน implementation ถัดไปที่เลือกคือ **Payroll & Advance — Security, Consistency & Audit Baseline**. ต้องเริ่มด้วย test account/data และเพิ่ม test/audit/idempotency boundary ก่อนพิจารณาเปลี่ยน rules หรือ deploy. ห้ามทำ destructive migration หรือแก้ข้อมูลเงินจริง.
+
+ผล validation ของ repository รอบนี้:
+
+- `npm run lint`: ผ่าน
+- `npm run test:auth`: ผ่าน 5/5
+- `npm run build`: ผ่าน
+- Build ยังมี warning จาก `lottie-web`, dynamic/static import duplication และ main chunk ประมาณ 4.6 MB
+- `npm ci` รายงาน 29 vulnerabilities: 2 critical, 16 high, 7 moderate, 4 low
+
+สถานะ production ยังคงเป็น **migration validation** ไม่ใช่ production complete จนกว่า integration, CRUD, role/security, runtime logs และ PWA evidence ตาม checklist จะผ่าน.
