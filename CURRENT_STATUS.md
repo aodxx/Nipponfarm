@@ -1,10 +1,10 @@
 # Nipponfarm Current Status
 
-อัปเดต: **4 กันยายน 2026** จาก branch `main` หลัง merge PR #21 (`ab099e1`). เอกสารนี้ใช้เป็นสถานะล่าสุดของงาน Consolidation และแยกชัดเจนระหว่าง **repository/emulator evidence** กับ **production evidence**.
+อัปเดต: **4 กันยายน 2026** จาก branch `main` หลัง merge PR #28 (`d6188a2`). เอกสารนี้เป็นสถานะล่าสุดของงาน **Nipponfarm Core Workflow & UX Consolidation** และแยกชัดเจนระหว่าง **repository/emulator evidence** กับ **production evidence**.
 
 ## สรุป
 
-Nipponfarm ยังอยู่ใน **controlled production-readiness verification** และยังไม่ควรประกาศ production complete แต่ baseline ความน่าเชื่อถือดีขึ้นอย่างมีนัยสำคัญ: authorization, Firestore owner boundary, Storage boundary, Payroll permissions/audit, Receipt idempotency, route lazy loading และ standalone startup มี automated evidence แล้ว.
+Nipponfarm ยังอยู่ใน **controlled production-readiness verification** และยังไม่ควรประกาศ production complete แต่ baseline ความน่าเชื่อถือดีขึ้นมาก: authorization, Firestore owner boundary, Storage boundary, Payroll permissions/audit, Receipt/Pig Sale idempotency, Sow lifecycle regression, route lazy loading, standalone startup, CI speed และ critical dependency remediation มี automated evidence แล้ว.
 
 ## สิ่งที่ผ่านแล้วใน repository / isolated test
 
@@ -15,7 +15,12 @@ Nipponfarm ยังอยู่ใน **controlled production-readiness verific
 - PR #18: Storage rules สำหรับ bill image เปลี่ยนเป็น `bills/<uid>/...`, จำกัด image type/size และผ่าน Firestore + Storage Emulator. **ยังไม่ถือว่า deployed production.**
 - PR #20: payroll calculation + payroll audit tests ถูกรวมเข้า standard CI gate ทุก PR.
 - PR #21: Payroll Emulator verification ผ่าน: active staff create/read own advance, wrong-owner deny, staff approve deny, admin approve pass, audit admin-only/immutable, pending owner cancellation pass และ approved cancellation deny.
-- Standard CI มี `npm ci`, authorization/regression tests, TypeScript lint, production build และ standalone startup smoke.
+- PR #23: Pig Sale persistence เพิ่ม deterministic document identity ลด retry/double-submit duplicate.
+- PR #24: Sow lifecycle regression tests ครอบคลุม breeding schedule, pregnancy confirmation, farrow/wean/recovery dates และ parity/status transitions.
+- PR #26: normal CI ใช้ `npm ci --no-audit`; dependency audit ถูกแยกไป workflow เฉพาะ ทำให้ Verify/Firebase Rules เร็วขึ้นโดยไม่ลด test/security coverage.
+- PR #27: Maintenance Storage legacy flat path ถูกจำกัดให้สร้างใหม่ได้เฉพาะ safe image และ object เดิม immutable; owner-scoped `maintenance/<uid>/...` ผ่าน Storage Emulator สำหรับ owner/wrong-owner behavior.
+- PR #28: dependency remediation แบบ compatibility-first ผ่าน tests, TypeScript และ production build; อัปเดต `react-router-dom` ภายใน major 7, Vite ภายใน major 6 และ override `protobufjs`/`websocket-driver`; generation audit ยืนยัน **critical vulnerabilities = 0**.
+- Standard CI มี authorization/regression tests, TypeScript lint, production build และ standalone startup smoke.
 
 ## สิ่งที่ยังต้องพิสูจน์หรือทำต่อ
 
@@ -28,14 +33,15 @@ Nipponfarm ยังอยู่ใน **controlled production-readiness verific
 
 ### Repository / architecture debt
 
-- Core workflows Sow Lifecycle, Pig Sale และ Maintenance ยังขาด full user-level acceptance/E2E evidence.
-- Storage legacy paths `news` และ `maintenance` ยังรักษา compatibility แบบ signed-in write; ต้อง migrate path ให้มี owner/role boundary ก่อน tighten ต่อ.
+- Core workflow acceptance ระดับ user/E2E ยังไม่ครบทุก flow แม้ Receipt, Pig Sale, Payroll และ Sow lifecycle มี regression evidence แล้ว.
+- Maintenance client ยังเขียน legacy flat path อยู่; owner-scoped path ถูกเปิดไว้ใน rules แล้วและควรย้าย client ในรอบถัดไป.
+- `news` Storage path ยังเป็น signed-in write compatibility และควรทำ role/owner boundary.
 - Firestore collections `sows`, `events`, `tasks`, `pig_sales`, chat/settings ยังใช้ active-user boundary กว้างและยังไม่มี `farmId` tenant boundary.
 - Live AI `/live` ใช้ standalone WebSocket และไม่ทำงานผ่าน current Vercel HTTP handler.
-- Dependency vulnerabilities จาก audit baseline ยังต้อง remediation แบบ compatibility-first; ห้าม `npm audit fix --force` โดยไม่ review.
-- Bundle ยังมี vendor/lottie debt แม้ initial route bundle ลดลงแล้ว.
+- `adm-zip` ยังต้อง review เพราะ remediation เป็น semver-major; `xlsx` ยังไม่มี fix จาก npm audit จึงต้องใช้ mitigation/replace strategy แทนการ force upgrade.
+- Bundle ยังมี vendor/lottie debt แม้ initial route bundle ลดลงแล้ว; `UserManagement` ยังมี static import ที่ลดประสิทธิภาพ code splitting บางส่วน.
 - PWA install/offline/update/recovery และ offline data sync ยังไม่มี device acceptance evidence.
 
 ## Phase decision
 
-เดินต่อใน **Core Workflow & UX Consolidation / controlled readiness** โดยไม่เพิ่ม major feature ใหม่. งานที่ทำได้จาก repository ให้เดินต่อได้ทันที; งานที่ต้องใช้ production credential, console หรือ backup permission ให้จัดเป็น external blocker และห้ามใช้ข้อมูลจริงแทน isolated evidence.
+เดินต่อใน **Core Workflow & UX Consolidation / controlled readiness** โดยไม่เพิ่ม major feature ใหม่. Repository blockers ที่ปิดแล้วห้ามเปิดงานซ้ำ; งานถัดไปให้โฟกัสเฉพาะ production integration access, remaining high dependency debt, maintenance owner-path client migration, PWA/offline acceptance และ UX consolidation ตามลำดับ.
