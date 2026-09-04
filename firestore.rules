@@ -97,6 +97,18 @@ service cloud.firestore {
              data.months is map;
     }
 
+    function isValidPayrollAudit(data) {
+      return data.keys().hasAll(['actorUid', 'actorRole', 'action', 'targetCollection', 'targetId', 'targetUserId', 'previous', 'next', 'occurredAt', 'createdAt']) &&
+             data.actorUid is string && data.actorUid.size() <= 128 &&
+             data.actorRole == 'ADMIN' &&
+             data.action in ['ADVANCE_APPROVED', 'ADVANCE_REJECTED', 'PAYSLIP_UPDATED', 'SALARY_UPDATED'] &&
+             data.targetCollection in ['salary_advances', 'payroll_slips', 'employee_salaries', 'EmployeeTransaction'] &&
+             data.targetId is string && data.targetId.size() <= 128 &&
+             data.targetUserId is string && data.targetUserId.size() <= 128 &&
+             data.previous is map && data.next is map &&
+             data.occurredAt is number && data.createdAt is number;
+    }
+
     // Default deny
     match /{document=**} {
       allow read, write: if false;
@@ -178,6 +190,10 @@ service cloud.firestore {
       allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow update: if isAdmin();
       allow delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid && existing().status == 'PENDING');
+    }
+    match /payroll_audit_events/{documentId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && isValidPayrollAudit(incoming()) && incoming().actorUid == request.auth.uid;
     }
 
     // AI Bills & Scan
