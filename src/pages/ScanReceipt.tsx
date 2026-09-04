@@ -5,109 +5,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { analyzeReceipt, ReceiptAnalysis, ReceiptItem } from '../services/aiService';
 import { useBottomSheet } from '../contexts/BottomSheetContext';
-import { saveScannedBill, getHistoricalItemDescriptions, getHistoricalVendors } from '../services/billService';
+import { saveScannedBill } from '../services/billService';
 import { optimizeImage } from '../services/imageOptimizer';
 import ReceiptWorkflowProgress from '../components/ReceiptWorkflowProgress';
 import ReceiptSaveSuccess from '../components/ReceiptSaveSuccess';
-
-const isGenericMerchantName = (name: string): boolean => {
-  if (!name) return true;
-  const lowercase = name.toLowerCase().trim();
-  const genericTerms = [
-    'ใบส่งของ',
-    'delivery bill',
-    'delivery',
-    'ใบเสร็จ',
-    'ใบเสร็จรับเงิน',
-    'บิล',
-    'receipt',
-    'ใบรับของ',
-    'กรอกข้อมูลบิลเอง',
-    'invoice',
-    'ใบกำกับภาษี',
-    'ใบรับสินค้า',
-    'รายการสินค้า',
-    'บิลเงินสด',
-    'cash bill'
-  ];
-  return genericTerms.some(term => lowercase.includes(term));
-};
-
-const normalizeDateStr = (dateStr: string): string => {
-  if (!dateStr) {
-    const today = new Date();
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  }
-  
-  const trimmed = dateStr.trim();
-  
-  // If it's already YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-    return trimmed;
-  }
-  
-  // Check if it's DD/MM/YYYY or D/M/YY
-  const slashParts = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-  if (slashParts) {
-    let day = slashParts[1].padStart(2, '0');
-    let month = slashParts[2].padStart(2, '0');
-    let year = slashParts[3];
-    if (year.length === 2) {
-      year = '20' + year;
-    }
-    let yNum = parseInt(year, 10);
-    if (yNum > 2400) {
-      yNum -= 543;
-      year = String(yNum);
-    }
-    return `${year}-${month}-${day}`;
-  }
-
-  // Check if it's YYYY/MM/DD
-  const revSlashParts = trimmed.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
-  if (revSlashParts) {
-    let year = revSlashParts[1];
-    let month = revSlashParts[2].padStart(2, '0');
-    let day = revSlashParts[3].padStart(2, '0');
-    let yNum = parseInt(year, 10);
-    if (yNum > 2400) {
-      yNum -= 543;
-      year = String(yNum);
-    }
-    return `${year}-${month}-${day}`;
-  }
-
-  // Match any digits to try and form YYYY-MM-DD
-  const digits = trimmed.match(/\d+/g);
-  if (digits && digits.length >= 3) {
-    let day = digits[0].padStart(2, '0');
-    let month = digits[1].padStart(2, '0');
-    let year = digits[2];
-    if (year.length === 2) {
-      year = '20' + year;
-    }
-    let yNum = parseInt(year, 10);
-    if (yNum > 2400) {
-      yNum -= 543;
-      year = String(yNum);
-    }
-    // Simple validation swap for dd/mm vs mm/dd
-    const dNum = parseInt(day, 10);
-    const mNum = parseInt(month, 10);
-    if (dNum > 12 && mNum <= 12) {
-      // Correct day/month order
-    } else if (dNum <= 12 && mNum > 12) {
-      // Swapped
-      const temp = day;
-      day = month;
-      month = temp;
-    }
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-  }
-
-  const today = new Date();
-  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-};
+import { isGenericMerchantName, normalizeReceiptDate } from '../features/receipt/scanReceiptUtils';
+import { useReceiptAnalysisProgress, useReceiptHistoryLookups, useReceiptServerStatus } from '../features/receipt/useScanReceiptSupport';
 
 export default function ScanReceipt() {
   const navigate = useNavigate();
@@ -120,7 +23,6 @@ export default function ScanReceipt() {
   const [isFlashSupported, setIsFlashSupported] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisProgress, setAnalysisProgress] = useState(0);
   const [analysisResult, setAnalysisResult] = useState<ReceiptAnalysis | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -136,47 +38,19 @@ export default function ScanReceipt() {
   const motionDetectionCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const isCapturingRef = useRef(false);
 
-  // Simulated progress during analysis
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isAnalyzing) {
-      setAnalysisProgress(0);
-      interval = setInterval(() => {
-        setAnalysisProgress(prev => {
-          if (prev < 30) return prev + 2; // Fast start
-          if (prev < 60) return prev + 1; // Normal speed
-          if (prev < 90) return prev + 0.5; // Slow down
-          if (prev < 98) return prev + 0.1; // Very slow near the end
-          return prev;
-        });
-      }, 100);
-    } else {
-      setAnalysisProgress(0);
-    }
-    return () => clearInterval(interval);
-  }, [isAnalyzing]);
 
   const [editableItems, setEditableItems] = useState<ReceiptItem[]>([]);
   const [manualMerchantName, setManualMerchantName] = useState('');
   const [isAddingNewVendor, setIsAddingNewVendor] = useState(false);
   const [manualTotal, setManualTotal] = useState<number>(0);
-  const [serverStatus, setServerStatus] = useState<'checking' | 'connected' | 'no-key' | 'error'>('checking');
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [showAllReviewItems, setShowAllReviewItems] = useState(false);
-  const [historicalDescriptions, setHistoricalDescriptions] = useState<string[]>([]);
-  const [historicalVendors, setHistoricalVendors] = useState<string[]>([]);
+  const analysisProgress = useReceiptAnalysisProgress(isAnalyzing);
+  const serverStatus = useReceiptServerStatus();
+  const { historicalDescriptions, historicalVendors, setHistoricalVendors } = useReceiptHistoryLookups();
 
-  useEffect(() => {
-    const fetchHistorical = async () => {
-      const descData = await getHistoricalItemDescriptions();
-      setHistoricalDescriptions(descData);
-      const vendorData = await getHistoricalVendors();
-      setHistoricalVendors(vendorData);
-    };
-    fetchHistorical();
-  }, []);
 
   // Camera Warmup Effect
   useEffect(() => {
@@ -291,29 +165,10 @@ export default function ScanReceipt() {
   }, [stabilityScore, analysisResult, isAnalyzing]);
 
   useEffect(() => {
-    checkServerStatus();
     return () => {
       stopCamera();
     };
   }, []);
-
-  const checkServerStatus = async () => {
-    try {
-      const res = await fetch('/api/health');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.aiKeyReady) {
-          setServerStatus('connected');
-        } else {
-          setServerStatus('no-key');
-        }
-      } else {
-        setServerStatus('error');
-      }
-    } catch (err) {
-      setServerStatus('error');
-    }
-  };
 
   const startCamera = async () => {
     try {
@@ -462,7 +317,7 @@ export default function ScanReceipt() {
 
       const normalizedResult = {
         ...result,
-        date: normalizeDateStr(result.date)
+        date: normalizeReceiptDate(result.date)
       };
 
       setAnalysisResult(normalizedResult);
