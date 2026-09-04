@@ -1,0 +1,56 @@
+name: Dependency Remediation Once
+
+on:
+  push:
+    branches:
+      - security/dependency-remediation-round1
+
+permissions:
+  contents: write
+
+jobs:
+  remediate:
+    if: github.repository == 'aodxx/Nipponfarm'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: security/dependency-remediation-round1
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit
+      - name: Apply compatibility-first dependency updates
+        run: |
+          npm install --save --no-audit react-router-dom@7.18.3 vite@6.4.3
+          npm pkg set overrides.protobufjs=7.6.6
+          npm pkg set overrides.websocket-driver=0.7.5
+          npm install --package-lock-only --no-audit
+      - run: npm ci --no-audit
+      - run: npm run test:auth
+      - run: npm run lint
+      - run: npm run build
+      - name: Verify critical audit count
+        shell: bash
+        run: |
+          npm audit --json > /tmp/dependency-audit.json || true
+          node - <<'NODE'
+          const fs = require('fs');
+          const audit = JSON.parse(fs.readFileSync('/tmp/dependency-audit.json', 'utf8'));
+          const critical = audit.metadata?.vulnerabilities?.critical ?? -1;
+          console.log('critical vulnerabilities after remediation:', critical);
+          if (critical !== 0) process.exit(1);
+          NODE
+      - name: Commit generated dependency files
+        run: |
+          if git diff --quiet -- package.json package-lock.json; then
+            echo 'Dependency files already up to date.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json package-lock.json
+          git commit -m 'security: remediate critical dependency advisories'
+          git push origin HEAD:security/dependency-remediation-round1
