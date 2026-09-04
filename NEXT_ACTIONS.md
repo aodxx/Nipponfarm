@@ -118,6 +118,16 @@
 
 ## Task 2: Payroll & Advance — Security, Consistency & Audit Baseline
 
+### Progress: duplicate submission guard — เสร็จแล้ว
+
+- [x] เพิ่ม `hasDuplicateAdvanceSubmission` และ `assertNoDuplicateAdvanceSubmission`
+- [x] เชื่อม guard เข้ากับ `employeeService.addAdvance` ก่อน `addDoc`
+- [x] แสดง duplicate-specific feedback ใน `AdvanceRequest`
+- [x] เพิ่ม submit-flow tests และผ่าน 7/7
+- [x] ไม่เปลี่ยน Firestore rules และไม่แตะข้อมูล production
+
+ข้อจำกัด: query-before-add ป้องกัน retry ปกติ แต่ยังไม่ป้องกัน concurrent writes แบบ atomic; ต้องทำ consistency/idempotency ต่อไป
+
 1. เพิ่ม unit tests สูตร advance/payroll และ net salary
 2. กำหนด transaction identity/idempotency สำหรับ request, approval และ payslip
 3. เพิ่ม audit record สำหรับ approve/reject/change โดยไม่เก็บ secret หรือข้อมูลเกินจำเป็น

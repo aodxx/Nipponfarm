@@ -60,3 +60,9 @@ Task 1 เสร็จในระดับเอกสารและ static co
 - `npm ci` รายงาน 29 vulnerabilities: 2 critical, 16 high, 7 moderate, 4 low
 
 สถานะ production ยังคงเป็น **migration validation** ไม่ใช่ production complete จนกว่า integration, CRUD, role/security, runtime logs และ PWA evidence ตาม checklist จะผ่าน.
+
+## Payroll Integration Progress — 4 กันยายน 2026
+
+เชื่อม duplicate advance guard เข้ากับ `employeeService.addAdvance` และ `AdvanceRequest` แล้ว โดย query รายการของ user/date ก่อนเขียน และปฏิเสธรายการที่มี user, amount และ date เดียวกันในสถานะ `PENDING` หรือ `APPROVED`; รายการ `REJECTED` สามารถส่งใหม่ได้. Payroll utility และ submit-flow tests ผ่าน 7/7, authorization regression ผ่าน 5/5, lint และ build ผ่าน.
+
+ข้อจำกัดที่ยังเปิดอยู่: query-before-add ลด duplicate จาก retry ปกติ แต่ยังไม่รับประกัน concurrent writes แบบ atomic transaction. ต้องทำเป็นงาน consistency/idempotency ถัดไปก่อนถือว่า payroll production-ready และยังไม่มีการเปลี่ยน Firestore rules หรือข้อมูล production.
