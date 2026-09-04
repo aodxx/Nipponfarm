@@ -1,0 +1,44 @@
+name: Wire Maintenance Owner Storage Once
+
+on:
+  push:
+    branches:
+      - security/maintenance-owner-storage
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: security/maintenance-owner-storage
+          fetch-depth: 0
+      - name: Scope maintenance image uploads to owner
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/pages/equipment/NewMaintenanceRequest.tsx')
+          s = p.read_text()
+          old = "const fileName = `maintenance/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;"
+          new = "const fileName = `maintenance/${user.uid}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;"
+          if old not in s:
+              if new in s:
+                  raise SystemExit(0)
+              raise SystemExit('maintenance upload path marker not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+      - run: npm ci --no-audit
+      - run: npm run test:auth
+      - run: npm run lint
+      - run: npm run build
+      - name: Commit owner-scoped path
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/pages/equipment/NewMaintenanceRequest.tsx
+          git commit -m 'fix: scope maintenance uploads to owner' || exit 0
+          git push origin HEAD:security/maintenance-owner-storage
