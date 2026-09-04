@@ -4,15 +4,17 @@ on:
   pull_request:
     paths:
       - 'firestore.rules'
+      - 'storage.rules'
       - 'firebase.json'
       - 'scripts/firestore-rules-emulator-test.mjs'
+      - 'scripts/storage-rules-emulator-test.mjs'
       - '.github/workflows/firebase-rules.yml'
 
 permissions:
   contents: read
 
 jobs:
-  firestore-rules:
+  firebase-rules:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,5 +29,7 @@ jobs:
       - run: npm ci
       - name: Install isolated emulator test tooling
         run: npm install --no-save --package-lock=false firebase-tools@15.28.2 @firebase/rules-unit-testing@5.0.2
-      - name: Run Firestore rules in isolated emulator
-        run: npx firebase emulators:exec --only firestore --project nipponfarm-rules-ci "node scripts/firestore-rules-emulator-test.mjs"
+      - name: Run Firestore and Storage rules in isolated emulators
+        run: >-
+          npx firebase emulators:exec --only firestore,storage --project nipponfarm-rules-ci
+          "node scripts/firestore-rules-emulator-test.mjs && node scripts/storage-rules-emulator-test.mjs"
