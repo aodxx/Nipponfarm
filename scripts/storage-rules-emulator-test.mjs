@@ -23,6 +23,7 @@ const testEnv = await initializeTestEnvironment({
 });
 
 const image = new Uint8Array([137, 80, 78, 71]);
+const updatedImage = new Uint8Array([137, 80, 78, 71, 1]);
 
 try {
   const staffA = testEnv.authenticatedContext('staff-a').storage();
@@ -41,9 +42,29 @@ try {
     uploadBytes(ref(staffA, 'bills/staff-a/not-image.txt'), image, { contentType: 'text/plain' }),
   );
 
+  // Legacy flat maintenance uploads stay create-compatible for the current client,
+  // but cannot be overwritten or deleted after creation.
+  const legacyMaintenanceRef = ref(staffA, 'maintenance/maintenance-a.webp');
   await assertSucceeds(
-    uploadBytes(ref(staffA, 'maintenance/maintenance-a.webp'), image, { contentType: 'image/webp' }),
+    uploadBytes(legacyMaintenanceRef, image, { contentType: 'image/webp' }),
   );
+  await assertFails(
+    uploadBytes(ref(staffB, 'maintenance/maintenance-a.webp'), updatedImage, { contentType: 'image/webp' }),
+  );
+  await assertFails(deleteObject(legacyMaintenanceRef));
+
+  // Owner-scoped maintenance paths support normal lifecycle while preventing cross-user writes.
+  const ownerMaintenanceRef = ref(staffA, 'maintenance/staff-a/maintenance-owned.webp');
+  await assertSucceeds(
+    uploadBytes(ownerMaintenanceRef, image, { contentType: 'image/webp' }),
+  );
+  await assertFails(
+    uploadBytes(ref(staffB, 'maintenance/staff-a/stolen.webp'), image, { contentType: 'image/webp' }),
+  );
+  await assertFails(
+    uploadBytes(ref(staffB, 'maintenance/staff-a/maintenance-owned.webp'), updatedImage, { contentType: 'image/webp' }),
+  );
+  await assertSucceeds(deleteObject(ownerMaintenanceRef));
 
   await assertFails(
     uploadBytes(ref(anonymous, 'maintenance/anonymous.webp'), image, { contentType: 'image/webp' }),
