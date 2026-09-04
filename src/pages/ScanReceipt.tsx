@@ -7,6 +7,7 @@ import { analyzeReceipt, ReceiptAnalysis, ReceiptItem } from '../services/aiServ
 import { useBottomSheet } from '../contexts/BottomSheetContext';
 import { saveScannedBill, getHistoricalItemDescriptions, getHistoricalVendors } from '../services/billService';
 import { optimizeImage } from '../services/imageOptimizer';
+import ReceiptWorkflowProgress from '../components/ReceiptWorkflowProgress';
 
 const isGenericMerchantName = (name: string): boolean => {
   if (!name) return true;
@@ -666,6 +667,9 @@ export default function ScanReceipt() {
 
   return (
     <div className="min-h-screen bg-transparent text-slate-900 dark:text-white pb-20 overflow-x-hidden">
+      <ReceiptWorkflowProgress
+        stage={isSaving ? 'saving' : analysisResult ? 'review' : isAnalyzing || capturedImage ? 'processing' : 'capture'}
+      />
       {/* Header */}
       <div className="flex items-center justify-between p-4 sticky top-0 bg-white/70 dark:bg-[#0f172a]/70 backdrop-blur-md z-10 border-b border-slate-200 dark:border-white/10">
         <div className="flex items-center gap-4">
