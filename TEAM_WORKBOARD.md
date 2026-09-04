@@ -1,100 +1,55 @@
-# Niponfarm Team Workboard
+# Nipponfarm Execution Board
 
-กระดานงานกลางสำหรับ lock scope ป้องกันงานทับกัน และจัดลำดับงานตาม dependency ของ **Niponfarm Core Workflow & Integration Reliability**
+กระดานสถานะสำหรับการทำงานแบบ **Single Controller Execution**
 
-**Last updated:** 4 September 2026
-**Baseline:** `main` after `2945440`
-**Arbitration owner:** `NIPON-LEAD-01`
-**Rule:** งานที่ไม่มี Task ID, Team, Owner, Reviewer, Branch, Status, Locked Area, Blocked By และ Definition of Done ห้ามเริ่ม
+**Controller:** `NIPON-LEAD-01`  
+**Last updated:** 4 September 2026  
+**Rule:** ไม่มี Team A / Team B queue แล้ว งานที่ไม่ชนกันเดินคู่ขนานได้ผ่านคนละ branch และใช้ PR + CI เป็น quality gate
 
-## Team split
+## Current execution
 
-| Team | Mission | Primary roles | Current boundary |
-|---|---|---|---|
-| Team A — Integration & Safety | Firebase, Auth, Storage, rules, AI, external integrations และ verification evidence | `NIPON-FB-01`, `NIPON-AI-01`, `NIPON-SEC-01`, `NIPON-RULES-01`, `NIPON-INT-01` | ห้ามแก้ production data/rules/credentials; งานที่ต้องใช้ test project ให้คง `BLOCKED` |
-| Team B — Core Workflow & Quality | Payroll, core workflow, acceptance matrix, regression และ test evidence | `NIPON-DEV-01`, `NIPON-TEST-01`, `NIPON-QA-01`, `NIPON-UX-01` | ห้ามเริ่ม UX/performance หรือ workflow implementation ที่ข้าม dependency |
+| Priority | Task | Status | Branch / Evidence | Result / Next action |
+|---|---|---|---|---|
+| P0 | Firebase rules static scenario matrix | `DONE` | PR #11, merge `64efda8` | matrix ถูก merge แล้ว; ใช้เป็น evidence สำหรับ owner/role risks |
+| P0 | Five core workflow verification matrix | `DONE` | PR #12, merge `80961ba` | matrix 5 workflow ถูก mergeแล้ว; runtime E2E ยังแยกเป็น external verification |
+| P0 | Firestore owner-boundary hardening | `IN_PROGRESS` | PR #13 `fix/firestore-owner-boundary` | tests 12/12 + lint ผ่าน; กำลังทำให้ build CI reproducible แล้ว merge |
+| P1 | Route-level lazy loading | `DONE` | PR #14, merge `e9c3f69` | main JS ลดจาก ~4.62 MB เป็น ~2.02 MB ก่อน gzip; route chunks แยกแล้ว |
+| P0 | Firebase isolated CRUD / permission E2E | `EXTERNAL_BLOCKED` | verification packet | ต้องมี isolated Firebase project/emulator/test accounts; ห้ามใช้ production data แทน |
+| P0 | Gemini production readiness | `EXTERNAL_BLOCKED` | `/api/health` baseline `AI_NOT_CONFIGURED` | ต้องเข้าถึง Vercel environment/test credential; connected Vercel project lookup ปัจจุบันตอบ 404 |
+| P1 | Receipt → Expense reliability/idempotency | `BACKLOG` | `ScanReceipt`, `billService` | เริ่มหลัง PR #13 merge; เน้น duplicate-save + persistence/error tests |
+| P1 | Payroll emulator verification | `EXTERNAL_BLOCKED` | payroll tests + verification matrix | code/idempotency/audit มีแล้ว; runtime permission/transaction ต้อง isolated Firebase |
+| P1 | Standalone startup lazy cron initialization | `BACKLOG` | `appServer.ts`, `dailyTasksAlert.ts` | แก้ eager Firebase config dependency โดยไม่ลด validation |
+| P1 | Storage least-privilege migration | `EXTERNAL_BLOCKED` | `storage.rules` | ต้องออกแบบ path/owner compatibility และทดสอบ isolated ก่อน deploy |
+| P1 | Dependency vulnerabilities | `BACKLOG` | npm audit baseline | 29 issues ใน full install; แก้เป็น compatibility branches ไม่ใช้ `npm audit fix --force` |
+| P2 | Remaining bundle/vendor cleanup | `BACKLOG` | build output | main ยัง ~2.02 MB; UserManagement static import และ lottie/vendor debt ยังเหลือ |
+| P2 | Live AI transport on Vercel | `BACKLOG` | `/live` standalone WS | ต้องเลือก HTTP streaming/SSE หรือ runtime ที่รองรับ long-lived WS |
 
-## Active board
+## Completed in this execution cycle
 
-| Task ID | Team | Task | Owner | Reviewer | Branch | Status | Locked Area / Files | Blocked By | Definition of Done |
-|---|---|---|---|---|---|---|---|---|---|
-| `NP-COORD-01` | Lead | Coordination / Workboard arbitration | `NIPON-LEAD-01` | `NIPON-RELEASE-01` | `main` / coordination | `IN_PROGRESS` | `AGENT_REGISTRY.md`, `TEAM_WORKBOARD.md`, coordination docs | — | ทุก task มี owner/branch/lock/evidence; collision ถูกตัดสินก่อนเริ่ม |
-| `NP-DOC-01` | Lead | Maintain project status docs | `NIPON-DOC-01` | `NIPON-LEAD-01` | `docs/<task-name>` | `IN_PROGRESS` | `CURRENT_STATUS.md`, `KNOWN_ISSUES.md`, `NEXT_ACTIONS.md`, `TEST_REPORT.md` | `NP-COORD-01` for sequencing | อัปเดตจาก verified evidence เท่านั้น; ระบุสิ่งที่ยังไม่พิสูจน์ |
-| `NP-RULES-02` | A | Static Firebase rules scenario matrix | `NIPON-SEC-01` | `NIPON-FB-01` | `security/rules-scenario-matrix-2026-09-04` | `REVIEW` | `docs/verification-packet/evidence/rules-scenario-matrix.md` เท่านั้น | — | matrix ครบ unauthenticated, ADMIN, STAFF, PENDING, RESIGNED, wrong-owner; ไม่แก้ rules; commit `4d028b8`, PR #11 |
-| `NP-RULES-03` | A | Existing-owner immutability / cross-owner rule hardening | `NIPON-RULES-01` | `NIPON-FB-01` | `security/owner-immutability-rules` | `BLOCKED` | `firestore.rules` เฉพาะ `bills`, `bill_items`, `pig_prices` และ emulator tests ที่เกี่ยวข้อง | `NP-RULES-02`, `NP-FB-01` | reproduce ช่องโหว่ wrong-owner ใน emulator ก่อน; patch ต้องตรวจ existing owner + incoming owner immutability; owner/admin allow paths และ wrong-owner deny paths ผ่าน; ห้าม deploy production rules ใน task นี้ |
-| `NP-FB-01` | A | Firebase Safety & Integration Verification | `NIPON-FB-01` | `NIPON-SEC-01` | `verify/firebase-test-environment` | `BLOCKED` | Firebase inventory, emulator/test project, Firestore/Storage verification | isolated Firebase test environment + owner approval | test project identity, rules/index inventory, CRUD/permission/cleanup evidence; ห้าม production mutation |
-| `NP-AI-01` | A | Gemini Integration Verification | `NIPON-AI-01` | `NIPON-SEC-01` | `verify/gemini-integration` | `BLOCKED` | Gemini readiness, safe error contract, Preview success path | test-only Gemini credential + Preview environment | authenticated AI success/error evidence และไม่เปิดเผย provider detail |
-| `NP-INT-01` | A | External integration safety inventory | `NIPON-INT-01` | `NIPON-LEAD-01` | `verify/integrations-inventory-2026-09-04` | `BLOCKED` | test-only credential/destination inventory ใน `docs/verification-packet/` | isolated destinations + owner approval | inventory ระบุชื่อ variable/environment/destination class โดยไม่เก็บค่า secret; เปิดเมื่อ `NP-FB-01` boundary พร้อม |
-| `NP-PAY-01` | B | Payroll rejected-resubmit correctness | `NIPON-DEV-01` | `NIPON-TEST-01` | completed via PR #8 / `fba7c2d` | `REVIEW` | `src/services/employeeService.ts`, `src/lib/payrollUtils.ts`, payroll tests | `NP-FB-01` for emulator validation | Submit → Reject → Resubmit ผ่าน emulator/test account และ rejected history immutable |
-| `NP-PAY-02` | B | Payroll Audit Trail verification/coverage | `NIPON-TEST-01` | `NIPON-QA-01` | `test/payroll-audit-verification` | `BLOCKED` | `payroll_audit_events`, payroll authorization flows | `NP-FB-01` | owner/admin/wrong-owner และ audit immutability verified in emulator/test environment |
-| `NP-WF-03` | B | Five core workflow verification matrix | `NIPON-QA-01` | `NIPON-LEAD-01` | `test/core-workflow-matrix-2026-09-04` | `REVIEW` | `docs/verification-packet/evidence/core-workflow-matrix.md` เท่านั้น | — | entry point, collections/services, roles, happy/error path, permission, reload/relogin, mobile usability และ blocker ครบ; commit `72a1a20`, PR #12 |
-| `NP-WF-02` | B | Receipt → Expense core workflow implementation | `—` | `NIPON-QA-01` | `—` | `READY` | `ScanReceipt`, `billService`, bill persistence/expense mapping | `NP-PAY-01`, `NP-WF-03`, integration gate, `NP-RULES-03` | ห้ามเริ่มจน Lead แต่งตั้ง owner/branch และ permission/idempotency blockers ถูกกำหนด acceptance criteria |
-| `NP-UX-01` | B | Dashboard / Navigation consolidation | `—` | `NIPON-UX-01` | `—` | `BLOCKED` | `Dashboard.tsx`, `Layout`, navigation, dashboard components | core workflow + integration baseline | ห้ามเริ่ม major UX refactor จน P0/P1 core/integration ผ่าน |
-| `NP-PERF-01` | B | Route lazy loading / bundle reduction | `—` | `NIPON-DEVOPS-01` | `—` | `BLOCKED` | `App.tsx`, route imports, build chunks | integration verification | baseline + before/after bundle evidence; ห้ามเริ่มก่อน dependency พร้อม |
+1. ปิด PR #10 เก่าที่ชน coordination files โดยไม่ merge
+2. Merge Firebase rules verification matrix (PR #11)
+3. Merge core workflow verification matrix (PR #12)
+4. เพิ่ม targeted Firestore owner immutability + active payroll boundary พร้อม regression tests (PR #13 กำลังปิด CI)
+5. Merge route-level lazy loading (PR #14)
+6. ลด initial main JS จากประมาณ 4.62 MB → 2.02 MB ก่อน gzip
+7. เปลี่ยนกติกาจาก multi-team queue เป็น Single Controller Execution
 
-## Newly confirmed review findings
+## External blockers เท่านั้นที่อนุญาตให้หยุดงาน
 
-### Security finding from `NP-RULES-02`
+ให้ใช้ `EXTERNAL_BLOCKED` เฉพาะเมื่อ repository side ทำได้ครบเท่าที่ทำได้แล้ว แต่ต้องใช้สิ่งใดสิ่งหนึ่งต่อไปนี้:
 
-Static review พบว่า rules ของ `bills`, `bill_items` และ `pig_prices` ใช้ incoming `userId` ใน update authorization โดยยังไม่มีหลักฐานว่า existing owner ถูกตรึงไว้ตลอด update. ในกรณีผิดพลาด ผู้ใช้ active ที่ไม่ใช่เจ้าของอาจพยายามเปลี่ยน `userId` ของ document เป็น UID ตนเองแล้วอัปเดต record ได้ จึงลงทะเบียน `NP-RULES-03` เป็น `BLOCKED` เพื่อให้ reproduce ด้วย emulator ก่อนแก้ rules และห้ามแก้ production rules จาก static finding เพียงอย่างเดียว
+- credential/secret ที่ไม่ควรเก็บใน Git
+- Firebase isolated project/emulator/test accounts
+- Vercel project/environment access
+- production console/backup/restore permission
+- external test destination
 
-### Workflow finding from `NP-WF-03`
+การมี blocker ภายนอกหนึ่งรายการไม่ห้ามเดินงาน repository อื่นที่ไม่เกี่ยวข้อง
 
-Matrix ระบุว่า 5 core workflows ยังไม่มีตัวใด production-ready. จุดค้างสำคัญคือ Receipt AI success ยังถูก block, bill save ไม่มี idempotency proof, Pig Sale ยังไม่มี edit/update path ตาม acceptance expectation, Payroll ยังขาด emulator permission evidence และ Maintenance ยังไม่มี explicit transition/audit validation. PR #12 เป็น evidence review ไม่ใช่ production sign-off
+## Next order
 
-## Dependency order
-
-```text
-NP-RULES-02 ─> NP-FB-01 ─> NP-RULES-03 ───────────┐
-                                                   ├─> NP-WF-02
-NP-WF-03 ──────────────────────────────────────────┤
-NP-PAY-01 ─> NP-PAY-02 ────────────────────────────┘
-
-NP-FB-01 ─> NP-AI-01 / NP-INT-01
-          └> NP-UX-01 / NP-PERF-01 (ภายหลัง)
-```
-
-ลำดับปัจจุบันคือ review PR #11/#12 โดยไม่อ้างว่า runtime ผ่าน, เตรียม isolated Firebase boundary, reproduce permission gaps และ Payroll scenarios ใน emulator/test account จากนั้นจึงพิจารณา Receipt implementation. UX/Performance งานใหญ่ยังคง blocked
-
-## File/area lock rules
-
-`IN_PROGRESS` หรือ `REVIEW` ถือว่า scope/area ถูก lock จนกว่า Lead จะปลดหรือเปลี่ยนเป็น `DONE`/`PAUSED`. ทีมอื่นห้ามแก้ไฟล์หรือ flow ที่ระบุไว้ในแถวนั้น
-
-`BLOCKED` ห้ามทำ implementation ต่อ ยกเว้น preparation ที่ไม่ชน locked area และไม่เปลี่ยน behavior. `READY` หมายถึงยังไม่มี owner; ห้ามเริ่มจนแต่งตั้ง owner, reviewer และ branch
-
-หากงานใหม่ต้องแตะ locked area เดียวกัน ให้สร้าง Task ID ใหม่เป็น `BLOCKED`, ระบุ `Blocked By` และหยุดการแก้ไฟล์จน Lead ตัดสิน scope split หรือ handoff
-
-## Review and evidence gate
-
-ก่อนเปลี่ยนเป็น `REVIEW` ต้องมี commit/PR, tests ที่เกี่ยวข้อง, `npm run lint`, `npm run build`, evidence reference, สิ่งที่ยังไม่ได้พิสูจน์ และ cleanup result หากมี test data. ห้ามใช้ `DONE` หากยังขาด emulator, production verification หรือ acceptance test ที่ Definition of Done ระบุไว้
-
-เอกสาร static verification สามารถอยู่ `REVIEW` ได้แม้ runtime test ยัง `NOT RUN` หากระบุข้อจำกัดตรงไปตรงมา แต่ห้ามเปลี่ยน workflow/runtime task เป็น `DONE` จาก static evidence เพียงอย่างเดียว
-
-## Registration template
-
-```text
-Task ID: NP-<DOMAIN>-NN
-Team: A | B | Lead
-Task:
-Owner:
-Reviewer:
-Branch:
-Status: READY | IN_PROGRESS | REVIEW | DONE | BLOCKED | PAUSED | CANCELLED
-Locked Area / Files:
-Blocked By:
-Definition of Done:
-Evidence:
-```
-
-## Arbitration and collision handling
-
-`NIPON-LEAD-01` เป็นผู้ตัดสินเมื่อสองทีมเลือก task เดียวกัน, locked area ซ้อนกัน, dependency ไม่ชัด หรือจำเป็นต้องเปลี่ยนลำดับงาน หากพบ collision ให้หยุดทั้งสองฝ่าย, ระบุ `BLOCKED_BY` ใน handoff/Workboard และห้ามแก้ไฟล์ทับกันหรือ force-push เข้า `main`
-
-PR #10 (`audit/recovery-baseline-2026-09-04`) เป็น branch/PR เก่าที่เกิดก่อน Workboard ปัจจุบันและซ้อนกับ coordination/status files; ห้าม merge PR นี้ตามสภาพเดิม. Role definitions ที่จำเป็นถูกย้ายเข้า `AGENT_REGISTRY.md` บน main แล้ว
-
-## Change log
-
-| Date (UTC) | Agent | Change | Evidence |
-|---|---|---|---|
-| 2026-09-04 | `NIPON-LEAD-01` | เพิ่ม team split, task ownership, locks และ dependency order | `TEAM_WORKBOARD.md` |
-| 2026-09-04 | `NIPON-LEAD-01` | Review PR #11/#12, ลงทะเบียน `NP-RULES-03` จาก owner-reassignment risk และ mark PR #10 เป็น superseded | PR #11, PR #12 |
+1. ทำ PR #13 ให้ CI ผ่านและ merge
+2. ทำ Receipt duplicate-save/idempotency reliability
+3. แก้ standalone startup initialization
+4. ลด dependency/performance debt ที่แก้ได้จาก repository
+5. เมื่อ Firebase/Vercel isolated access พร้อม ค่อยปิด runtime verification ทั้งชุดในรอบเดียว
