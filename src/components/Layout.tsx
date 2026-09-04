@@ -15,6 +15,7 @@ import PigLogo from './PigLogo';
 import HeaderWeatherWidget from './HeaderWeatherWidget';
 import FloatingSpeedDial from './FloatingSpeedDial';
 import ProfileSettingsHub from './ProfileSettingsHub';
+import ConsolidatedNavDock from './ConsolidatedNavDock';
 
 export default function Layout() {
   const { user, userProfile } = useAuth();
@@ -579,8 +580,10 @@ export default function Layout() {
       {/* Floating Speed Dial Tool Actions */}
       {location.pathname === '/' && <FloatingSpeedDial />}
 
+      <ConsolidatedNavDock />
+
       {/* Enhanced Bottom Navigation (Floating Dock) with Curved Liquid Animation */}
-      <div className="fixed bottom-0 left-0 right-0 w-full z-20 pointer-events-none pb-safe px-4 pb-4">
+      <div className="hidden fixed bottom-0 left-0 right-0 w-full z-20 pointer-events-none pb-safe px-4 pb-4">
         <div className="mx-auto max-w-md relative h-[92px] pointer-events-auto">
           
           {/* Animated SVG Curved Background Bar */}
