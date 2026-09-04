@@ -96,7 +96,7 @@ export default function NewMaintenanceRequest() {
             }
             // Create unique file name
             const fileExtension = file.name.split('.').pop();
-            const fileName = `maintenance/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
+            const fileName = `maintenance/${user.uid}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
             const storageRef = ref(storage, fileName);
             
             // Upload the file
