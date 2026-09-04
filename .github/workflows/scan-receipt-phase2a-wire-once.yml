@@ -44,15 +44,20 @@ jobs:
           if count != 1:
               raise SystemExit(f'expected utility block once, found {count}')
 
+          progress_state = "\n  const [analysisProgress, setAnalysisProgress] = useState(0);"
+          if progress_state not in text:
+              raise SystemExit('analysis progress state not found')
+          text = text.replace(progress_state, '', 1)
+
           text, count = re.subn(
-              r"\n  const \[analysisProgress, setAnalysisProgress\] = useState\(0\);.*?\n  \}, \[isAnalyzing\]\);",
+              r"\n  // Simulated progress during analysis\n  useEffect\(\(\) => \{.*?\n  \}, \[isAnalyzing\]\);",
               "",
               text,
               count=1,
               flags=re.S,
           )
           if count != 1:
-              raise SystemExit('analysis progress block not found')
+              raise SystemExit('analysis progress effect not found')
 
           text = text.replace("\n  const [serverStatus, setServerStatus] = useState<'checking' | 'connected' | 'no-key' | 'error'>('checking');", "")
           text = text.replace("\n  const [historicalDescriptions, setHistoricalDescriptions] = useState<string[]>([]);", "")
@@ -73,10 +78,11 @@ jobs:
           if hooks.strip() not in text:
               text = text.replace(state_marker, state_marker + hooks)
 
-          text = text.replace(
-              "  useEffect(() => {\n    checkServerStatus();\n    return () => {\n      stopCamera();\n    };\n  }, []);",
-              "  useEffect(() => {\n    return () => {\n      stopCamera();\n    };\n  }, []);",
-          )
+          cleanup_old = "  useEffect(() => {\n    checkServerStatus();\n    return () => {\n      stopCamera();\n    };\n  }, []);"
+          cleanup_new = "  useEffect(() => {\n    return () => {\n      stopCamera();\n    };\n  }, []);"
+          if cleanup_old not in text:
+              raise SystemExit('camera cleanup/server check effect not found')
+          text = text.replace(cleanup_old, cleanup_new, 1)
 
           text, count = re.subn(
               r"\n  const checkServerStatus = async \(\) => \{.*?\n  \};\n\n  const startCamera",
