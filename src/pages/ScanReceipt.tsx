@@ -8,6 +8,7 @@ import { useBottomSheet } from '../contexts/BottomSheetContext';
 import { saveScannedBill, getHistoricalItemDescriptions, getHistoricalVendors } from '../services/billService';
 import { optimizeImage } from '../services/imageOptimizer';
 import ReceiptWorkflowProgress from '../components/ReceiptWorkflowProgress';
+import ReceiptSaveSuccess from '../components/ReceiptSaveSuccess';
 
 const isGenericMerchantName = (name: string): boolean => {
   if (!name) return true;
@@ -110,7 +111,7 @@ const normalizeDateStr = (dateStr: string): string => {
 
 export default function ScanReceipt() {
   const navigate = useNavigate();
-  const { showAlert, showSuccess, showError, showLoading, hideLoading } = useBottomSheet();
+  const { showAlert, showError, showLoading, hideLoading } = useBottomSheet();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
@@ -161,6 +162,7 @@ export default function ScanReceipt() {
   const [manualTotal, setManualTotal] = useState<number>(0);
   const [serverStatus, setServerStatus] = useState<'checking' | 'connected' | 'no-key' | 'error'>('checking');
   const [isSaving, setIsSaving] = useState(false);
+  const [saveComplete, setSaveComplete] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [historicalDescriptions, setHistoricalDescriptions] = useState<string[]>([]);
   const [historicalVendors, setHistoricalVendors] = useState<string[]>([]);
@@ -609,9 +611,8 @@ export default function ScanReceipt() {
       const audio = new Audio("/assets/sounds/success_alert.mp3");
       audio.play().catch(e => console.warn("Failed to play save success sound:", e));
 
-      showSuccess("บันทึกข้อมูลบิลและรายการสินค้าเรียบร้อยแล้ว", "สำเร็จ");
       setShowMismatchWarning(false);
-      reset();
+      setSaveComplete(true);
     } catch (err: any) {
       hideLoading();
       console.error(err);
@@ -658,12 +659,24 @@ export default function ScanReceipt() {
   };
 
   const reset = () => {
+    setSaveComplete(false);
     setCapturedImage(null);
     setAnalysisResult(null);
     setAnalysisError(null);
     setEditableItems([]);
     startCamera();
   };
+
+  if (saveComplete) {
+    return (
+      <ReceiptSaveSuccess
+        vendorName={manualMerchantName}
+        totalAmount={manualTotal}
+        onScanNext={reset}
+        onOpenHistory={() => navigate('/scan/history')}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-transparent text-slate-900 dark:text-white pb-20 overflow-x-hidden">
