@@ -14,6 +14,22 @@ export interface PayrollCalculationResult {
   netSalary: number;
 }
 
+export type AdvanceSubmissionCandidate = Pick<SalaryAdvance, 'userId' | 'amount' | 'date'>;
+
+/**
+ * Returns true when an active advance with the same user, amount, and date
+ * already exists. Rejected requests are intentionally eligible for resubmission.
+ */
+export const hasDuplicateAdvanceSubmission = (
+  existing: SalaryAdvance[],
+  candidate: AdvanceSubmissionCandidate,
+): boolean => existing.some((advance) => (
+  (advance.status === 'PENDING' || advance.status === 'APPROVED') &&
+  advance.userId === candidate.userId &&
+  advance.amount === candidate.amount &&
+  advance.date === candidate.date
+));
+
 /**
  * Calculates net salary for a given period (twice-a-month pay cycle)
  * Period 1: 1st - 15th
