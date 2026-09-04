@@ -23,13 +23,18 @@ service firebase.storage {
       allow delete: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // Existing maintenance uploads currently use a flat maintenance/<file> path.
-    // Keep signed-in compatibility until the client migrates to maintenance/<uid>/<file>,
-    // but enforce image-only payloads and the same 10 MB limit as the UI.
-    match /maintenance/{allPaths=**} {
+    match /maintenance/{userId}/{allPaths=**} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isSafeImage(10 * 1024 * 1024);
-      allow delete: if isSignedIn();
+      allow create, update: if isSignedIn() && request.auth.uid == userId && isSafeImage(10 * 1024 * 1024);
+      allow delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Legacy flat maintenance/<file> uploads remain create-compatible for the current client.
+    // Once created, ownerless legacy objects are immutable and cannot be deleted by clients.
+    match /maintenance/{legacyFile} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isSafeImage(10 * 1024 * 1024);
+      allow update, delete: if false;
     }
 
     match /avatars/{userId}/{allPaths=**} {
@@ -44,7 +49,6 @@ service firebase.storage {
       allow delete: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // Default deny
     match /{allPaths=**} {
       allow read, write: if false;
     }
