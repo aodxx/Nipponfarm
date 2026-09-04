@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { calculateNetSalary } from './payrollUtils';
+import {
+  assertNoDuplicateAdvanceSubmission,
+  calculateNetSalary,
+  DuplicateAdvanceSubmissionError,
+} from './payrollUtils';
 import * as payrollUtils from './payrollUtils';
 import { SalaryAdvance } from '../types';
 
@@ -95,4 +99,21 @@ test('does not block a new submission after a previous request was rejected', ()
     }),
     false,
   );
+});
+
+test('submit flow rejects a duplicate before persistence', () => {
+  assert.throws(
+    () => assertNoDuplicateAdvanceSubmission(
+      [advance({ status: 'PENDING' })],
+      { userId: 'staff-1', amount: 2500, date: '2026-09-10' },
+    ),
+    DuplicateAdvanceSubmissionError,
+  );
+});
+
+test('submit flow allows a non-duplicate candidate to continue to persistence', () => {
+  assert.doesNotThrow(() => assertNoDuplicateAdvanceSubmission(
+    [advance({ status: 'PENDING' })],
+    { userId: 'staff-1', amount: 2500, date: '2026-09-11' },
+  ));
 });

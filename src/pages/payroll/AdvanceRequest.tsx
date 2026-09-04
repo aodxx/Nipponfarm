@@ -4,6 +4,7 @@ import { ArrowLeft, Send, HandCoins, CheckCircle2 } from 'lucide-react';
 import { addAdvance } from '../../services/employeeService';
 import { useBottomSheet } from '../../contexts/BottomSheetContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { DuplicateAdvanceSubmissionError } from '../../lib/payrollUtils';
 
 export default function AdvanceRequest() {
   const navigate = useNavigate();
@@ -30,7 +31,11 @@ export default function AdvanceRequest() {
       setAmount('');
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
-      showAlert('เกิดข้อผิดพลาดในการบันทึกคำขอ');
+      if (error instanceof DuplicateAdvanceSubmissionError) {
+        showAlert('มีคำขอเบิกล่วงหน้ารายการเดียวกันอยู่แล้ว');
+      } else {
+        showAlert('เกิดข้อผิดพลาดในการบันทึกคำขอ');
+      }
     } finally {
       setSaving(false);
     }
