@@ -129,3 +129,11 @@ test('creates a stable submission key from user, date, and normalized amount', (
     'advance-staff%2F1-2026-09-10-2500.50',
   );
 });
+
+
+test('rejected resubmission must create a new document and preserve the rejected record', () => {
+  assert.equal(payrollUtils.getAdvanceWriteMode({ status: 'REJECTED' }), 'CREATE_NEW');
+  assert.equal(payrollUtils.getAdvanceWriteMode({ status: 'PENDING' }), 'DUPLICATE');
+  assert.equal(payrollUtils.getAdvanceWriteMode({ status: 'APPROVED' }), 'DUPLICATE');
+  assert.equal(payrollUtils.getAdvanceWriteMode(null), 'CREATE_NEW');
+});

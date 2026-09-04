@@ -148,6 +148,13 @@
 
 ข้อจำกัด: ยังไม่ได้รัน Firebase Emulator หรือ production test-account CRUD เพราะ repository ยังไม่มี emulator harness; ต้องทำเป็น verification task ถัดไปก่อน production sign-off
 
+### Progress: rejected advance resubmission — แก้ใน code/test รอ merge
+
+- [x] rejected record เดิมถูกปฏิบัติเป็น immutable history
+- [x] resubmit ใช้ document ใหม่แทนการ `transaction.update` record เดิม
+- [x] เพิ่ม regression test สำหรับ write mode ของ `REJECTED`, `PENDING` และ `APPROVED`
+- [ ] ยืนยัน Submit → Reject → Resubmit ด้วย Firebase Emulator/test account
+
 1. เพิ่ม unit tests สูตร advance/payroll และ net salary
 2. กำหนด transaction identity/idempotency สำหรับ request, approval และ payslip
 3. เพิ่ม audit record สำหรับ approve/reject/change โดยไม่เก็บ secret หรือข้อมูลเกินจำเป็น

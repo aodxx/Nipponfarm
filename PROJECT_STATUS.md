@@ -78,3 +78,7 @@ Task 1 เสร็จในระดับเอกสารและ static co
 เพิ่ม `payroll_audit_events` สำหรับบันทึกการ approve/reject advance โดยเขียน audit event ใน transaction เดียวกับการเปลี่ยนสถานะ เพื่อไม่ให้เกิด status change ที่ไม่มี audit record. Event เก็บ actor UID/role, target, previous/next status และ amount เท่านั้น; ไม่เก็บ slip image, password, token หรือ secret. Firestore rules จำกัด read/create ให้ admin และบังคับ `actorUid` ตรงกับ authenticated UID พร้อม default-deny update/delete.
 
 Owner/admin policy tests ผ่าน 6/6, payroll tests ผ่าน 8/8, authorization regression ผ่าน 5/5, lint และ build ผ่าน. ยังไม่มี Firebase Emulator harness หรือ production test-account evidence จึงยังเป็น code/test complete ไม่ใช่ production sign-off.
+
+## Rejected Advance Resubmission Fix — 4 กันยายน 2026
+
+จาก review พบว่า `addAdvance` เดิมพยายาม update rejected document เดิมเมื่อพนักงานส่งคำขอใหม่ ซึ่งขัดกับ immutable audit history และ Firestore rule ที่ไม่อนุญาตให้ staff update advance. แก้ให้ rejected resubmission สร้าง document ใหม่ และคง rejected record เดิมไว้. Regression test ผ่านแล้ว แต่ยังต้องยืนยันด้วย Firebase Emulator/test account.

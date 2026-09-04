@@ -50,6 +50,14 @@ export const assertNoDuplicateAdvanceSubmission = (
   }
 };
 
+export type AdvanceWriteMode = 'CREATE_NEW' | 'DUPLICATE';
+
+export const getAdvanceWriteMode = (
+  existing: Pick<SalaryAdvance, 'status'> | null,
+): AdvanceWriteMode => existing?.status === 'PENDING' || existing?.status === 'APPROVED'
+  ? 'DUPLICATE'
+  : 'CREATE_NEW';
+
 /**
  * Calculates net salary for a given period (twice-a-month pay cycle)
  * Period 1: 1st - 15th
