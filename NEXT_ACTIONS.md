@@ -1,45 +1,66 @@
 # Nipponfarm Next Actions
 
-อัปเดต: **4 กันยายน 2026** จาก Audit commit `fba7c2d`.
+อัปเดต: **4 กันยายน 2026** หลัง merge PR #21.
 
 ## หลักการ
 
-ยังไม่เพิ่ม feature ใหม่และยังไม่เปลี่ยน architecture ครั้งใหญ่. ห้ามลบหรือแก้ Firebase data, rules, hosting configuration หรือ secrets เดิมโดยไม่มี owner approval, backup และ rollback plan. ทุก code change ต้องมี test, `npm run lint` และ `npm run build`.
+ยังไม่เพิ่ม major feature ใหม่. งานปัจจุบันคือ reliability, security, acceptance และ production verification. ทุก runtime/code change ต้องมี automated tests ที่เกี่ยวข้อง, `npm run lint`, `npm run build` และ rollback/compatibility consideration.
 
-## P0 — ต้องแก้/พิสูจน์ก่อน
+## สิ่งที่ปิดแล้ว ไม่ต้องทำซ้ำ
 
-1. **Firebase safety baseline:** ระบุ project/database/region, rules/indexes, collections, user counts และ Storage objects ของ project เดิม `Thailottery`; ทำ backup/export และ reconciliation โดยไม่ลบหรือแก้ข้อมูล.
-2. **Production integration gate:** ยืนยันชื่อ server-only variables โดยไม่เปิดเผยค่า, ตั้ง/ตรวจ `GEMINI_API_KEY` ชุดใหม่ตาม owner process และทำ preview/test-account verification.
-3. **Authorization evidence:** ทดสอบ unauthenticated, PENDING, STAFF, ADMIN และ wrong-owner ต่อ routes และ core data ด้วยข้อมูลแยก.
+- Firestore owner-boundary hardening + Emulator verification.
+- Receipt duplicate-save/retry idempotency.
+- Route-level lazy loading baseline.
+- Standalone startup without Firebase runtime env.
+- Bill Storage owner/type/size boundary + Storage Emulator verification.
+- Payroll calculation/audit regression suites in standard CI.
+- Payroll own/wrong-owner/admin/audit immutability scenarios in Firestore Emulator.
 
-## P1 — สำคัญ
+## P0 — Production access gate
 
-- แก้ standalone eager initialization ด้วย lazy boundary และ startup test; ห้ามทำก่อนบันทึก root cause/มี regression test.
-- ตัดสินใจ transport สำหรับ Live AI ที่รองรับ Vercel หรือแยก runtime.
-- ตรวจและปรับ Storage/Firestore ownership policy ผ่าน emulator ก่อน deploy rules.
-- ตรวจ Vercel runtime logs หลัง smoke requests โดยไม่เก็บ secret, PII หรือ raw payload.
-- ทำ dependency remediation branch สำหรับ critical/high issues โดยเฉพาะ `protobufjs`/`xlsx` และรัน regression.
-- รัน core workflow acceptance matrix ครบ: Sow Lifecycle, Receipt → Expense, Pig Sale, Payroll & Advance, Maintenance.
-- ลด initial bundle หลัง integration verification ผ่าน.
+1. **Firebase inventory/backup/reconciliation** สำหรับ project เดิม `Thailottery` ก่อน deploy/migrate สิ่งที่กระทบ production.
+2. **Controlled rules deployment verification** หลัง backup: deploy latest reviewed Firestore/Storage rules, smoke owner/admin flows และมี rollback evidence.
+3. **Vercel/Gemini production integration**: resolve project access, ตรวจ server-side env โดยไม่เปิดเผยค่า, ทำ `/api/health` ให้ `aiReady:true` และทดสอบ Receipt/Swine/TTS success path.
+4. **Production runtime logs**: ตรวจ 4xx/5xx/secret/PII leakage หลัง smoke requests.
 
-## P2 — ปรับปรุงภายหลัง
+P0 เหล่านี้ให้หยุดเฉพาะรายการที่ต้องใช้ console/credential; ห้ามหยุดงาน repository อื่น.
 
-- PWA install/offline/update/relogin acceptance test บน Android จริง.
-- ออกแบบ pending sync สำหรับ workflow ภาคสนามที่ไม่ใช่ธุรกรรมการเงิน.
-- อัปเดต technical documentation ให้ตรงกับ Vercel.
-- ตั้ง package metadata/release version/changelog ให้เหมาะกับระบบจริง.
-- ทำ dashboard/BI หลัง data quality และ permission boundary ผ่าน.
+## P1 — Repository work ที่ทำต่อได้ทันที
+
+1. **Dependency remediation inventory + compatibility fixes**
+   - ระบุ direct/transitive package ที่ทำให้เกิด critical/high findings.
+   - แก้ทีละกลุ่ม ไม่ใช้ `npm audit fix --force`.
+   - ทุก upgrade ต้องผ่าน CI/core regression.
+2. **Core acceptance: Sow Lifecycle**
+   - Add Sow → lifecycle event → derived task/reminder → update state → persistence/error path.
+3. **Core acceptance: Pig Sale**
+   - create sale → validate weight/price/total → persistence → list/report consistency.
+4. **Core acceptance: Maintenance**
+   - create request → optional media → status transition → resolved state → permission/error paths.
+5. **Storage legacy path migration**
+   - ย้าย `news`/`maintenance` uploads ไป path ที่ระบุ owner/role ได้ แล้ว tighten rules พร้อม Emulator tests.
+6. **Firestore farm/tenant design**
+   - เพิ่ม permission matrix และ migration plan สำหรับ `farmId` ก่อนเปิด multi-farm.
+
+## P2
+
+- Remaining vendor/lottie bundle cleanup.
+- Live AI transport decision: SSE/HTTP streaming หรือ separate WS runtime.
+- Android PWA install/offline/update/recovery acceptance.
+- Offline pending-sync design สำหรับ non-financial field workflows.
+- Consolidate infrastructure documentation ให้ Vercel เป็น deployment source of truth.
+- Package/release metadata + changelog policy.
 
 ## NEXT TASK
 
-**Task 1: สร้าง Firebase Safety & Integration Verification Packet บนสภาพแวดล้อมทดสอบที่แยกจาก production**
+**Dependency Remediation — Inventory First**
 
-ขอบเขตของงานเดียวนี้คือรวบรวม project inventory/backup evidence ที่ owner อนุมัติ, ใช้ test account/data แยก, ตรวจ `GEMINI_API_KEY` readiness และรัน authorization/API smoke matrix พร้อมบันทึก timestamp, environment, status และ cleanup proof. ห้ามเปลี่ยน Firestore rules, migrate/delete data, rotate/revoke credential หรือเปิดใช้งาน external integration ใน production ระหว่างงานนี้.
+เป้าหมายรอบถัดไปคือสร้าง evidence ว่า critical/high vulnerabilities มาจาก package ใด, เป็น direct หรือ transitive, มี safe patched version หรือไม่ และ upgrade ใดมี breaking risk จากนั้นแก้เฉพาะชุดที่ compatibility พิสูจน์ได้ด้วย CI.
 
-## Definition of Done ของ NEXT TASK
+### Definition of Done
 
-- มี project ID/database ID/region/rules/index inventory โดยไม่บันทึก secret.
-- มี backup/export และ record-count reconciliation ที่ตรวจย้อนกลับได้.
-- Health readiness และ API auth matrix มีหลักฐานจาก test environment.
-- ไม่มี production record ถูกสร้าง แก้ หรือลบโดยไม่ตั้งใจ.
-- รายงาน `CURRENT_STATUS.md`, `TEST_REPORT.md`, `KNOWN_ISSUES.md` อัปเดตด้วยผลจริง.
+- มี vulnerability inventory แยก direct/transitive/severity.
+- ระบุ package ที่ไม่มี safe automatic fix แยกต่างหาก.
+- upgrade ที่ทำจริงผ่าน authorization, payroll, receipt, rules-policy tests, TypeScript, build และ standalone smoke.
+- ไม่มี `--force` หรือ major-version jump โดยไม่มี rationale/regression evidence.
+- อัปเดต `CURRENT_STATUS.md`, `KNOWN_ISSUES.md`, `TEAM_WORKBOARD.md` หลังจบรอบ.
