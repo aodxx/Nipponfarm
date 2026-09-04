@@ -1,58 +1,57 @@
 # Nipponfarm Execution Board
 
-กระดานสถานะสำหรับการทำงานแบบ **Single Controller Execution**
+กระดานสถานะสำหรับ **Single Controller Execution**
 
 **Controller:** `NIPON-LEAD-01`  
 **Last updated:** 4 September 2026  
-**Rule:** ไม่มี Team A / Team B queue แล้ว งานที่ไม่ชนกันเดินคู่ขนานได้ผ่านคนละ branch และใช้ PR + CI เป็น quality gate
+**Rule:** ไม่มี Team A / Team B queue; งาน repository ที่ไม่ชนกันเดินได้ทันทีผ่าน branch + PR + automated evidence.
 
 ## Current execution
 
-| Priority | Task | Status | Branch / Evidence | Result / Next action |
+| Priority | Task | Status | Evidence | Result / Next action |
 |---|---|---|---|---|
-| P0 | Firebase rules static scenario matrix | `DONE` | PR #11 | matrix ถูก merge แล้ว; ใช้เป็น evidence สำหรับ owner/role risks |
-| P0 | Five core workflow verification matrix | `DONE` | PR #12 | matrix 5 workflow ถูก mergeแล้ว; runtime E2E ยังแยกเป็น external verification |
-| P0 | Firestore owner-boundary hardening | `DONE` | PR #16, merge `8f5b478` | owner immutability + active payroll boundary ผ่าน Verify และ isolated Firestore Emulator CI; PR #13 เก่าปิดเป็น superseded |
-| P1 | Route-level lazy loading | `DONE` | PR #14, merge `e9c3f69` | main JS ลดจาก ~4.62 MB เป็น ~2.02 MB ก่อน gzip; route chunks แยกแล้ว |
-| P1 | Receipt → Expense reliability/idempotency | `DONE` | PR #15, merge `27939a6` | retry/double-submit ใช้ deterministic IDs, ไม่สร้าง bill/item ซ้ำ และ CI ผ่าน |
-| P1 | Standalone startup without Firebase cron config | `IN_PROGRESS` | PR #17 `fix/standalone-startup-fallback` | fallback เปิด HTTP app ได้โดยไม่ลด Firebase validation; CI กำลังทดสอบ build + `/api/health` โดย unset Firebase env |
-| P0 | Firebase isolated CRUD / permission E2E | `EXTERNAL_BLOCKED` | Firestore Emulator baseline จาก PR #16 | owner/wrong-owner/admin/PENDING/RESIGNED subset ผ่านแล้ว; ยังเหลือ Auth + full Firestore CRUD + Storage E2E/test data boundary |
-| P0 | Gemini production readiness | `EXTERNAL_BLOCKED` | `/api/health` baseline `AI_NOT_CONFIGURED` | ต้องเข้าถึง Vercel environment/test credential; connector เห็น team แต่ project lookup ยัง 404 แม้ GitHub deployment status ระบุ project slug `nipponfarm` |
-| P1 | Payroll emulator verification | `PARTIAL` | payroll code tests + PR #16 permission baseline | active-account boundary ผ่าน emulator; ยังเหลือ approve/reject/resubmit transaction + audit persistence scenario |
-| P1 | Storage least-privilege migration | `BACKLOG` | `storage.rules` | rules ปัจจุบันให้ signed-in write กว้างใน news/bills/maintenance; ต้องรักษา compatibility กับ path จริงและเพิ่ม emulator tests ก่อน deploy |
-| P1 | Dependency vulnerabilities | `BACKLOG` | npm audit baseline | 29 issues ใน full install; แก้เป็น compatibility branches ไม่ใช้ `npm audit fix --force` |
-| P2 | Remaining bundle/vendor cleanup | `BACKLOG` | build output | main ยัง ~2.02 MB; UserManagement static import และ lottie/vendor debt ยังเหลือ |
-| P2 | Live AI transport on Vercel | `BACKLOG` | `/live` standalone WS | current Vercel HTTP handler ไม่รองรับ standalone WS; ต้องเลือก HTTP streaming/SSE หรือ runtime ที่รองรับ long-lived WS |
-| P1 | Production runtime log verification | `EXTERNAL_BLOCKED` | Vercel connector | GitHub status ยืนยัน Vercel integration แต่ connected project API ยัง lookup `nipponfarm` ไม่ได้ |
+| P0 | Firebase rules static scenario matrix | `DONE` | PR #11 | baseline owner/role matrix |
+| P0 | Five core workflow verification matrix | `DONE` | PR #12 | static workflow matrix merged |
+| P0 | Firestore owner-boundary hardening | `DONE` | PR #16 `8f5b478` | owner immutability + active payroll boundary ผ่าน Firestore Emulator |
+| P1 | Route-level lazy loading | `DONE` | PR #14 `e9c3f69` | main JS ~4.62 MB → ~2.02 MB before gzip |
+| P1 | Receipt → Expense idempotency | `DONE` | PR #15 `27939a6` | deterministic bill/item IDs; retry ไม่สร้าง duplicate |
+| P1 | Standalone startup fallback | `DONE` | PR #17 `14581fd` | build + startup without Firebase env + `/api/health` smoke ผ่าน |
+| P1 | Storage owner/type/size boundary | `DONE_REPO` | PR #18 `db17fe7` | Firestore + Storage Emulator PASS; production rules deployment ยังไม่ยืนยัน |
+| P1 | Payroll regression suites in CI | `DONE` | PR #20 `085e883` | payroll calculation + audit tests รันใน standard CI ทุก PR |
+| P1 | Payroll permission/audit Emulator | `DONE` | PR #21 `ab099e1` | own/wrong-owner/admin/audit immutability/cancel scenarios ผ่าน Emulator |
+| P0 | Firebase inventory/backup/reconciliation | `EXTERNAL_BLOCKED` | project เดิม `Thailottery` | ต้อง console/backup access ก่อน migration หรือ production rules deploy |
+| P0 | Gemini production readiness | `EXTERNAL_BLOCKED` | baseline `AI_NOT_CONFIGURED` | ต้อง Vercel env/test credential + success-path smoke |
+| P1 | Production rules deployment verification | `EXTERNAL_BLOCKED` | latest rules อยู่ใน repo | ต้อง backup + controlled deploy + rollback + production smoke |
+| P1 | Core workflow acceptance: Sow/Pig Sale/Maintenance | `READY` | workflow matrix | ทำ isolated acceptance โดยไม่เพิ่ม feature |
+| P1 | Dependency vulnerabilities | `READY` | npm audit baseline | compatibility-first remediation; no force upgrade |
+| P1 | Storage legacy path migration | `READY` | `news`/`maintenance` ยัง broad | เปลี่ยน client path ให้ owner/role scoped ก่อน tighten rules |
+| P1 | Firestore `farmId` / permission matrix | `DESIGN_READY` | active-user collections ยัง broad | ออกแบบ tenant boundary ก่อนรองรับหลายฟาร์ม |
+| P2 | Remaining bundle/vendor cleanup | `READY` | main ~2.02 MB | lottie/vendor cleanup หลัง P1 |
+| P2 | Live AI transport | `READY` | `/live` standalone WS | ออกแบบ SSE/HTTP streaming หรือแยก WS runtime |
+| P2 | PWA/offline acceptance | `EXTERNAL_DEVICE_TEST` | PWA shell มีแล้ว | Android install/offline/update/recovery + pending sync |
 
-## Completed in this execution cycle
+## Completed in current consolidation cycle
 
-1. ปิด PR #10 เก่าที่ชน coordination files โดยไม่ merge
-2. Merge Firebase rules verification matrix (PR #11)
-3. Merge core workflow verification matrix (PR #12)
-4. Merge route-level lazy loading (PR #14) และลด initial main JS จากประมาณ 4.62 MB → 2.02 MB ก่อน gzip
-5. Merge Receipt idempotency/retry safety (PR #15)
-6. Rebuild Firestore security จาก current `main`, ผ่านทั้ง static regression + isolated Firestore Emulator, merge PR #16 และปิด PR #13 เก่า
-7. เปลี่ยนกติกาจาก multi-team queue เป็น Single Controller Execution
-8. เริ่ม PR #17 เพื่อปิด standalone startup blocker ด้วย HTTP fallback + CI smoke test
-
-## External blockers เท่านั้นที่อนุญาตให้หยุดงาน
-
-ให้ใช้ `EXTERNAL_BLOCKED` เฉพาะเมื่อ repository side ทำได้ครบเท่าที่ทำได้แล้ว แต่ต้องใช้สิ่งใดสิ่งหนึ่งต่อไปนี้:
-
-- credential/secret ที่ไม่ควรเก็บใน Git
-- Firebase isolated project/test accounts สำหรับ scenario ที่ emulator อย่างเดียวไม่พอ
-- Vercel project/environment access
-- production console/backup/restore permission
-- external test destination
-
-การมี blocker ภายนอกหนึ่งรายการไม่ห้ามเดินงาน repository อื่นที่ไม่เกี่ยวข้อง
+1. ปิด coordination PR เก่าที่เสี่ยง overwrite.
+2. Merge PR #11/#12 verification baselines.
+3. Merge PR #14 route lazy loading.
+4. Merge PR #15 Receipt idempotency.
+5. Merge PR #16 Firestore owner-boundary + Emulator CI.
+6. Merge PR #17 standalone startup smoke.
+7. Merge PR #18 Storage rules + Storage Emulator verification.
+8. Merge PR #20 payroll regression suites into standard CI; ปิด PR #19 ที่ superseded.
+9. Merge PR #21 payroll permission/audit Emulator verification.
+10. ใช้ Single Controller Execution แทน multi-team queue.
 
 ## Next order
 
-1. ทำ PR #17 ให้ CI smoke startup ผ่านและ merge
-2. ปิด Storage least-privilege ที่แก้/ทดสอบได้โดยไม่ deploy production rules
-3. ทำ dependency vulnerability remediation แบบ compatibility-first
-4. ทำ Payroll transaction/audit emulator scenarios ที่ไม่ต้องใช้ production data
-5. ลด remaining bundle/vendor debt
-6. เมื่อ Firebase/Vercel production access พร้อม ค่อยปิด Gemini, full CRUD/Storage, runtime logs และ production smoke ในรอบเดียว
+1. **Dependency remediation inventory + safe compatibility fixes** ที่ทำได้จาก repository.
+2. **Core acceptance: Sow Lifecycle → Pig Sale → Maintenance** ด้วย isolated/test data.
+3. **Storage legacy path migration** (`news`, `maintenance`) ให้ owner/role scoped.
+4. **Firestore farm/tenant permission design** ก่อนเพิ่ม multi-farm capability.
+5. **Remaining bundle/vendor cleanup.**
+6. เมื่อ production access พร้อม ให้ทำครั้งเดียวเป็น gate: Firebase backup/inventory → controlled rules deploy → Vercel env/Gemini → runtime logs → production smoke.
+
+## External blocker rule
+
+`EXTERNAL_BLOCKED` ใช้เฉพาะเมื่อ repository-side work ทำครบแล้วและต้องใช้ credential, console, backup/restore permission, production environment หรือ physical-device evidence. Blocker หนึ่งรายการไม่หยุดงาน repository อื่น.
