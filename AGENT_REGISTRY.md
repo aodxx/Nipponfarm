@@ -20,7 +20,7 @@
 5. `KNOWN_ISSUES.md`
 6. `NEXT_ACTIONS.md`
 
-จากนั้นต้องลงทะเบียน **Task ID + Owner + Branch + Status + Locked Area** ใน `TEAM_WORKBOARD.md` ก่อนเริ่ม implementation ห้ามเลือกงานเองจาก repository และห้ามใช้ชื่อ, task, branch หรือ scope ที่มีผู้รับผิดชอบ/lock อยู่แล้ว
+จากนั้นต้องลงทะเบียน **Task ID + Team + Owner + Reviewer + Branch + Status + Locked Area + Blocked By + Definition of Done** ใน `TEAM_WORKBOARD.md` ก่อนเริ่ม implementation ห้ามเลือกงานเองจาก repository และห้ามใช้ชื่อ, task, branch หรือ scope ที่มีผู้รับผิดชอบ/lock อยู่แล้ว
 
 เมื่อเริ่มงาน ให้เปลี่ยนสถานะเป็น `IN_PROGRESS` ใน Workboard และระบุ branch กับ task ที่ชัดเจน เมื่อจบ milestone ให้บันทึก commit/PR/evidence แล้วเปลี่ยนเป็น `REVIEW`, `DONE`, `BLOCKED` หรือ `PAUSED` ตามสถานการณ์จริง
 
@@ -46,24 +46,35 @@ Registry ใช้สถานะบทบาทระดับ Agent:
 
 | Agent ID | Role | Responsibility | Branch / workspace | Status | Current task | Last evidence |
 |---|---|---|---|---|---|---|
-| `NIPON-LEAD-01` | Audit Coordinator / Team Lead | จัดลำดับงาน, คุม scope, ตรวจ handoff และประสาน owner | `main` หรือ coordination workspace | `In Progress` | คุม Verification Packet และตัดสินใจงานถัดไป | `TEAM_WORKBOARD.md`, `NEXT_ACTIONS.md` |
-| `NIPON-AUDIT-01` | Project Audit & Recovery | ตรวจ baseline, build, runtime, API, risk และเอกสาร audit | `audit/recovery-baseline-2026-09-04` | `Completed` | สร้าง Audit baseline และ Verification Packet | commit `3fc9899` |
-| `NIPON-PM-01` | Project Manager | ตรวจ PRD, README, roadmap, progress, phase และงานค้าง | `pm/<task-name>` | `Planned` | — | — |
-| `NIPON-ARCH-01` | System Architect | ตรวจ repository, frontend, backend, Firebase, hosting และ data flow | `arch/<task-name>` | `Planned` | — | `SYSTEM_ARCHITECTURE.md` |
-| `NIPON-DEV-01` | Developer | แก้ implementation เฉพาะ scope พร้อม tests; ห้าม refactor ใหญ่โดยไม่มีแผน | `fix/<task-name>` หรือ `feature/<task-name>` | `Planned` | — | `TEAM_WORKBOARD.md` |
-| `NIPON-TEST-01` | Tester | รัน user flow, API smoke, CRUD, permissions, integration และ cleanup evidence | `test/<task-name>` | `Planned` | — | `TEST_REPORT.md` |
-| `NIPON-FB-01` | Firebase / Backend | ตรวจ Firebase project, Auth, Firestore, Storage, rules และ environment names | `verify/firebase-test-environment` | `Blocked` | รอ isolated Firebase Test Project และ owner approval | `docs/verification-packet/`, `TEAM_WORKBOARD.md` |
-| `NIPON-AI-01` | AI Integration | ตรวจ Gemini readiness, provider initialization, model, error codes และ safe responses | `verify/gemini-integration` | `Blocked` | รอ test-only Gemini credential และ Preview environment | `docs/verification-packet/`, `TEAM_WORKBOARD.md` |
-| `NIPON-SEC-01` | Security Reviewer | ตรวจ secrets, authorization, ownership, dependency และ data-loss risk | `security/<task-name>` | `Planned` | — | `KNOWN_ISSUES.md` |
-| `NIPON-DOC-01` | Documentation | ดูแล status, architecture, test report, known issues, next actions และ handoff | `docs/<task-name>` | `In Progress` | ดูแลเอกสารตามผล verification | `CURRENT_STATUS.md`, `TEAM_WORKBOARD.md` |
+| `NIPON-LEAD-01` | Audit Coordinator / Team Lead | จัดลำดับงาน, คุม scope, ตรวจ handoff และประสาน owner | `main` หรือ coordination workspace | `In Progress` | `NP-COORD-01` | `TEAM_WORKBOARD.md` |
+| `NIPON-AUDIT-01` | Project Audit & Recovery | ตรวจ baseline, build, runtime, API, risk และเอกสาร audit | `audit/<task-name>` | `Completed` | Audit baseline | `docs/verification-packet/` |
+| `NIPON-PM-01` | Project Manager | ตรวจ PRD, roadmap, progress, phase และงานค้าง | `pm/<task-name>` | `Planned` | — | `PROJECT_STATUS.md` |
+| `NIPON-ARCH-01` | System Architect | ตรวจ frontend, backend, Firebase, hosting และ data flow | `arch/<task-name>` | `Planned` | — | `SYSTEM_ARCHITECTURE.md` |
+| `NIPON-DEV-01` | Developer | แก้ implementation เฉพาะ scope พร้อม tests | `fix/<task-name>` หรือ `feature/<task-name>` | `Review` | `NP-PAY-01` | PR #8 / `fba7c2d` |
+| `NIPON-TEST-01` | Tester | รัน user flow, API smoke, CRUD, permissions, integration และ cleanup evidence | `test/<task-name>` | `Blocked` | `NP-PAY-02` | `TEAM_WORKBOARD.md` |
+| `NIPON-FB-01` | Firebase / Backend | ตรวจ Firebase project, Auth, Firestore, Storage และ isolated test boundary | `verify/firebase-test-environment` | `Blocked` | `NP-FB-01`; reviewer `NP-RULES-02` | `docs/verification-packet/` |
+| `NIPON-AI-01` | AI Integration | ตรวจ Gemini readiness, provider initialization, models และ safe responses | `verify/gemini-integration` | `Blocked` | `NP-AI-01` | `TEAM_WORKBOARD.md` |
+| `NIPON-SEC-01` | Security Reviewer | ตรวจ secrets, authorization, ownership และ data-loss risk | `security/<task-name>` | `Review` | `NP-RULES-02` | PR #11 |
+| `NIPON-DOC-01` | Documentation | ดูแล status, known issues, next actions, test report และ handoff | `docs/<task-name>` | `In Progress` | `NP-DOC-01` | `CURRENT_STATUS.md` |
+| `NIPON-PROD-01` | Product Owner | ยืนยัน business priority, acceptance criteria, production impact และ go/no-go | `product/<task-name>` | `Planned` | — | `PROJECT_STATUS.md` |
+| `NIPON-UX-01` | UX / Field Workflow | ตรวจ usability, Thai copy, mobile layout, offline expectations และ field workflow | `ux/<task-name>` | `Blocked` | reviewer `NP-UX-01` | `TEAM_WORKBOARD.md` |
+| `NIPON-QA-01` | QA / E2E Tester | ออกแบบ acceptance matrix, regression, browser/device checks และ defect reproduction | `test/<task-name>` | `Review` | `NP-WF-03`; reviewer `NP-PAY-02` | PR #12 |
+| `NIPON-DATA-01` | Data Steward | ตรวจ schema, migration, backup, reconciliation, retention และ data quality | `data/<task-name>` | `Blocked` | รอ isolated Firebase boundary | `docs/verification-packet/` |
+| `NIPON-DEVOPS-01` | DevOps / Release | ดูแล CI, Vercel Preview/Production, rollback และ deployment evidence | `ops/<task-name>` | `Planned` | reviewer `NP-PERF-01` | `docs/PRODUCTION_DEPLOYMENT_RUNBOOK.md` |
+| `NIPON-SRE-01` | SRE / Observability | ตรวจ health, runtime logs, incident response และ recovery drill | `sre/<task-name>` | `Planned` | — | `TEST_REPORT.md` |
+| `NIPON-AUTH-01` | Identity & Access | ตรวจ Firebase Auth providers, role lifecycle, token verification และ account recovery | `security/auth-<task-name>` | `Planned` | — | `server/firebaseAuth.ts` |
+| `NIPON-RULES-01` | Firebase Rules Reviewer | ทบทวน Firestore/Storage rules, owner/farm boundary, emulator tests และ rollback | `security/rules-<task-name>` | `Blocked` | รอ `NP-FB-01`; candidate owner `NP-RULES-03` | `firestore.rules`, `storage.rules` |
+| `NIPON-INT-01` | Integration Operator | ดูแล test-only SMTP, Gemini, R2/ImageKit, Cron destinations และ cleanup | `verify/integrations-<task-name>` | `Blocked` | `NP-INT-01` | `TEAM_WORKBOARD.md` |
+| `NIPON-RELEASE-01` | Release Reviewer | ตรวจ diff, checks, PR approval, release notes และ post-deploy smoke evidence | `release/<task-name>` | `Planned` | reviewer `NP-COORD-01` | `.github/workflows/verify.yml` |
+| `NIPON-SUPPORT-01` | Operations / Support | รวบรวม defect จากผู้ใช้, reproduce, triage และติดตาม resolution | `support/<task-name>` | `Planned` | — | `KNOWN_ISSUES.md` |
 
 ## Scope ownership rules
 
-แต่ละงานต้องมี **Agent owner เพียงหนึ่งตัว** และอาจมี reviewer แยกต่างหาก งานที่เกี่ยวข้องกับข้อมูลจริง, Firebase rules, credentials, deployment หรือ production ต้องมี owner approval ตามขั้นตอนของโครงการก่อนดำเนินการ
+แต่ละงานต้องมี **Agent owner เพียงหนึ่งตัว** และ reviewer แยกต่างหากตาม Workboard งานที่เกี่ยวข้องกับข้อมูลจริง, Firebase rules, credentials, deployment หรือ production ต้องมี owner approval ตามขั้นตอนของโครงการก่อนดำเนินการ
 
 `TEAM_WORKBOARD.md` เป็น source of truth สำหรับ **task ownership และ file/area lock** ถ้า Workboard ระบุ task เป็น `IN_PROGRESS` หรือ `REVIEW` ให้ถือว่า scope/area นั้นถูก lock ทีมอื่นห้ามแก้พร้อมกันโดยไม่มี handoff หรือ scope split ที่ `NIPON-LEAD-01` อนุมัติ
 
-`NIPON-LEAD-01` มีหน้าที่ประสานลำดับงาน แต่ไม่ควรแก้ scope ของ `NIPON-FB-01`, `NIPON-SEC-01` หรือ `NIPON-AI-01` โดยพลการ หากยังไม่มีหลักฐานและการส่งต่อที่ชัดเจน
+Agent สามารถสร้าง Task ID ใหม่เองได้เมื่อพบงานใหม่ แต่ต้องตรวจ ID/scope เดิมก่อน ลงทะเบียนใน Workboard และหาก dependency หรือ locked area ยังไม่พร้อมต้องตั้งสถานะ `BLOCKED` แทนการเริ่ม implementation
 
 ## Branch and commit convention
 
@@ -77,6 +88,8 @@ security/<short-description>
 docs/<short-description>
 audit/<short-description>
 test/<short-description>
+ops/<short-description>
+ux/<short-description>
 ```
 
 Commit ควรเป็น atomic และอธิบายเหตุผล เช่น:
@@ -108,9 +121,9 @@ security: verify owner boundary for maintenance records
 
 ## Current coordination notes
 
-Current baseline หลัง audit packet คือ commit `d2b7b43` บน `main`; payroll rejected-resubmit fix อยู่ใน `fba7c2d` และยังต้อง emulator/test-account verification ก่อน production sign-off
+Current coordination baseline คือ main หลัง `2945440`. Team A ส่ง `NP-RULES-02` เข้า PR #11 และ Team B ส่ง `NP-WF-03` เข้า PR #12 โดยทั้งสองงานเป็น static evidence และไม่แตะ production data/rules/credentials
 
-สถานะที่ต้องถือเป็นข้อจำกัดร่วมของทุก Agent คือ production ยังอยู่ในระยะ migration validation, Gemini health ยังเป็น `AI_NOT_CONFIGURED`, Firebase test project ยังไม่ถูกสร้างใน packet นี้ และยังไม่มีสิทธิ์ให้ทำ production CRUD, rules deployment, migration, credential rotation หรือ deletion โดยไม่มี owner approval
+สถานะที่ต้องถือเป็นข้อจำกัดร่วมของทุก Agent คือ production ยังอยู่ในระยะ migration validation, Gemini health ยังเป็น `AI_NOT_CONFIGURED`, Firebase isolated test boundary ยังไม่พร้อม และยังไม่มีสิทธิ์ให้ทำ production CRUD, rules deployment, migration, credential rotation หรือ deletion โดยไม่มี owner approval
 
 สำหรับลำดับงานและ lock ปัจจุบัน ให้ดู `TEAM_WORKBOARD.md` แทนการตีความจาก commit history เอง
 
@@ -119,4 +132,5 @@ Current baseline หลัง audit packet คือ commit `d2b7b43` บน `ma
 | Date (UTC) | Agent | Change | Evidence |
 |---|---|---|---|
 | 2026-09-04 | `NIPON-AUDIT-01` | สร้างทะเบียน Agent และกำหนด roster เริ่มต้น | `AGENT_REGISTRY.md` |
-| 2026-09-04 | `NIPON-LEAD-01` | เชื่อม Registry กับ Team Work Rules และ Workboard เพื่อป้องกันงานทับกัน | `TEAM_WORK_RULES.md`, `TEAM_WORKBOARD.md` |
+| 2026-09-04 | `NIPON-LEAD-01` | เชื่อม Registry กับ Team Work Rules และ Workboard | `TEAM_WORK_RULES.md`, `TEAM_WORKBOARD.md` |
+| 2026-09-04 | `NIPON-LEAD-01` | เพิ่ม roles ที่ Workboard อ้างถึงและผูกสถานะกับสองทีมล่าสุด | PR #11, PR #12 |
