@@ -1,0 +1,68 @@
+name: Restore Pen Map Entry Once
+
+on:
+  push:
+    branches:
+      - ux/restore-pen-map-entry
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ux/restore-pen-map-entry
+          fetch-depth: 0
+      - name: Add contextual pen map entry
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/pages/SowList.tsx')
+          text = path.read_text()
+
+          old_import = "import { Search, Plus, Filter, Hourglass, Heart, Activity, Baby, Stethoscope, Clock, ShieldAlert } from 'lucide-react';"
+          new_import = "import { Search, Plus, Filter, Hourglass, Heart, Activity, Baby, Stethoscope, Clock, ShieldAlert, MapPinned, ChevronRight } from 'lucide-react';"
+          if old_import not in text:
+              raise SystemExit('lucide import marker not found')
+          text = text.replace(old_import, new_import, 1)
+
+          marker = "      {/* Search and Filter */}\n"
+          block = '''      <button
+        onClick={() => navigate('/pen-map')}
+        className="mb-6 flex w-full items-center gap-4 rounded-3xl border border-cyan-200 bg-gradient-to-r from-cyan-50 to-white p-4 text-left shadow-sm transition-all active:scale-[0.99] dark:border-cyan-400/20 dark:from-cyan-500/10 dark:to-white/5"
+        aria-label="เปิดผังคอกเพื่อดูตำแหน่งแม่พันธุ์และพ่อพันธุ์"
+      >
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-cyan-600 text-white shadow-sm">
+          <MapPinned className="h-6 w-6" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-black text-slate-950 dark:text-white">ผังคอก</p>
+          <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-white/55">ดูตำแหน่งแม่พันธุ์–พ่อพันธุ์ในแต่ละกรง และย้ายตำแหน่งได้</p>
+        </div>
+        <ChevronRight className="h-5 w-5 shrink-0 text-cyan-700 dark:text-cyan-300" />
+      </button>
+
+'''
+          if block.strip() not in text:
+              if marker not in text:
+                  raise SystemExit('search/filter marker not found')
+              text = text.replace(marker, block + marker, 1)
+
+          path.write_text(text)
+          PY
+      - run: npm ci --no-audit
+      - run: npm run test:auth
+      - run: npm run lint
+      - run: npm run build
+      - name: Commit UX entry
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/pages/SowList.tsx
+          git commit -m 'feat: restore pen map entry in farm list' || exit 0
+          git push origin HEAD:ux/restore-pen-map-entry
