@@ -10,7 +10,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { BottomSheetProvider } from './contexts/BottomSheetContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 
-const Dashboard = lazy(() => import('./pages/Dashboard'));
+const TodayDashboard = lazy(() => import('./pages/TodayDashboard'));
+const DashboardLegacy = lazy(() => import('./pages/Dashboard'));
 const SowList = lazy(() => import('./pages/SowList'));
 const AddSow = lazy(() => import('./pages/AddSow'));
 const SowDetails = lazy(() => import('./pages/SowDetails'));
@@ -125,7 +126,8 @@ function AppRoutes() {
           <Route path="/login" element={<Login />} />
 
           <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-            <Route index element={<Dashboard />} />
+            <Route index element={<TodayDashboard />} />
+            <Route path="dashboard-legacy" element={<DashboardLegacy />} />
             <Route path="sows" element={<SowList />} />
             <Route path="calendar" element={<Calendar />} />
             <Route path="pen-map" element={<PenMap />} />
