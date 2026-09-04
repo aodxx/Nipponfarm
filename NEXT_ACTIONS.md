@@ -136,7 +136,17 @@
 - [x] เพิ่ม tests ของ key normalization และ transaction decision behavior
 - [x] payroll tests 8/8, authorization tests 5/5, lint และ build ผ่าน
 
-ข้อจำกัด: รายการเก่าที่ไม่มี `submissionKey` ยังต้องผ่าน legacy lookup; ยังต้องเพิ่ม audit trail และทดสอบ emulator/production test account ก่อนถือว่า payroll production-ready
+ข้อจำกัด: รายการเก่าที่ไม่มี `submissionKey` ยังต้องผ่าน legacy lookup; ยังต้องทดสอบ emulator/production test account ก่อนถือว่า payroll production-ready
+
+### Progress: payroll audit trail และ owner/admin policy tests — เสร็จในระดับ code/test
+
+- [x] เพิ่ม `payroll_audit_events` schema builder โดยเก็บ actor, target, transition และ metadata ที่ปลอดภัย
+- [x] ผูกการ approve/reject advance กับการเขียน audit event ใน transaction เดียวกับ status update
+- [x] เพิ่ม Firestore rule: admin อ่าน/สร้างได้เมื่อ `actorUid` ตรงกับผู้ล็อกอิน; ไม่มี update/delete
+- [x] เพิ่ม owner/admin/wrong-owner policy tests 6/6
+- [x] ไม่เก็บ password, token, secret หรือ slip image ใน audit metadata
+
+ข้อจำกัด: ยังไม่ได้รัน Firebase Emulator หรือ production test-account CRUD เพราะ repository ยังไม่มี emulator harness; ต้องทำเป็น verification task ถัดไปก่อน production sign-off
 
 1. เพิ่ม unit tests สูตร advance/payroll และ net salary
 2. กำหนด transaction identity/idempotency สำหรับ request, approval และ payslip

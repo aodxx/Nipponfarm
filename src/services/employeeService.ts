@@ -4,9 +4,11 @@ import { SalaryAdvance, EmployeeBaseSalary, EmployeeTransaction } from '../types
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { OperationType, handleFirestoreError } from '../lib/firestore-error';
 import { assertNoDuplicateAdvanceSubmission, DuplicateAdvanceSubmissionError, getAdvanceSubmissionKey } from '../lib/payrollUtils';
+import { buildPayrollAuditEvent, PayrollAuditInput } from '../lib/payrollAudit';
 
 const SALARY_ADVANCES_COLLECTION = 'salary_advances';
 const SALARIES_COLLECTION = 'employee_salaries';
+const PAYROLL_AUDIT_COLLECTION = 'payroll_audit_events';
 
 const getCurrentUserId = () => {
   const userId = auth.currentUser?.uid;
@@ -69,20 +71,53 @@ export const addAdvance = async (amount: number, date: string) => {
 export const updateAdvanceStatus = async (advanceId: string, status: 'APPROVED' | 'REJECTED', slipImage?: string) => {
   try {
     const docRef = doc(db, SALARY_ADVANCES_COLLECTION, advanceId);
-    const updateData: any = {
-      status,
-      updatedAt: Date.now()
-    };
-    if (slipImage) {
-      updateData.slipImage = slipImage;
-    }
-    await updateDoc(docRef, updateData);
+    const actorUid = getCurrentUserId();
+    await runTransaction(db, async (transaction) => {
+      const advanceSnapshot = await transaction.get(docRef);
+      if (!advanceSnapshot.exists()) {
+        throw new Error('Advance request not found');
+      }
+
+      const current = advanceSnapshot.data() as SalaryAdvance;
+      const now = Date.now();
+      const updateData: Record<string, unknown> = { status, updatedAt: now };
+      if (slipImage) updateData.slipImage = slipImage;
+      transaction.update(docRef, updateData);
+
+      const auditEvent = buildPayrollAuditEvent({
+        actor: { uid: actorUid, role: 'ADMIN' },
+        action: status === 'APPROVED' ? 'ADVANCE_APPROVED' : 'ADVANCE_REJECTED',
+        target: { collection: SALARY_ADVANCES_COLLECTION, documentId: advanceId, userId: current.userId },
+        previous: { status: current.status, amount: current.amount },
+        next: { status, amount: current.amount },
+        occurredAt: now,
+      });
+      transaction.set(doc(db, PAYROLL_AUDIT_COLLECTION, `${advanceId}-${status}-${now}`), {
+        ...auditEvent,
+        createdAt: now,
+      });
+    });
   } catch (error) {
     console.error("Error updating advance: ", error);
     handleFirestoreError(error, OperationType.UPDATE, SALARY_ADVANCES_COLLECTION);
     throw error;
   }
 }
+
+export const recordPayrollAudit = async (input: PayrollAuditInput) => {
+  const event = buildPayrollAuditEvent(input);
+  try {
+    const docRef = await addDoc(collection(db, PAYROLL_AUDIT_COLLECTION), {
+      ...event,
+      createdAt: event.occurredAt,
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error("Error recording payroll audit: ", error);
+    handleFirestoreError(error, OperationType.CREATE, PAYROLL_AUDIT_COLLECTION);
+    throw error;
+  }
+};
 
 export const recordEmployeeTransaction = async (transaction: Omit<EmployeeTransaction, 'id'>) => {
   try {
