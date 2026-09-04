@@ -1,106 +1,68 @@
-# Nipponfarm Team Work Rules
+# Nipponfarm Execution Rules
 
-เอกสารนี้เป็นกติกากลางสำหรับป้องกัน Agent/ทีมทำงานซ้ำ ทับไฟล์ หรือ merge งานชนกันระหว่างโครงการ **Nipponfarm Core Workflow & UX Consolidation**
+เอกสารนี้กำหนดวิธีทำงานแบบ **Single Controller Execution** เพื่อให้โครงการเดินหน้าเร็วโดยยังรักษาความปลอดภัยของข้อมูลและคุณภาพของโค้ด
 
-## 1. Source of truth
+## 1. ผู้คุมงานหลัก
 
-ก่อนเริ่มงานทุกครั้งต้องอ่านตามลำดับ:
+`NIPON-LEAD-01` เป็นผู้จัดลำดับ ลงมือ ประสาน และ merge งานทั้งหมดของรอบปัจจุบันโดยตรง ไม่แบ่งคิวเป็น Team A / Team B และไม่รอ handoff ระหว่าง Agent หากงานหนึ่งไม่จำเป็นต้องรออีกงาน ให้เดินคู่ขนานผ่านคนละ branch ได้ทันที
 
-1. `AGENT_REGISTRY.md`
-2. `TEAM_WORKBOARD.md`
-3. `CURRENT_STATUS.md`
-4. `KNOWN_ISSUES.md`
-5. `NEXT_ACTIONS.md`
-6. เอกสารหรือ verification packet ของ task ที่เกี่ยวข้อง
+Agent/Role อื่นใน `AGENT_REGISTRY.md` เป็น **บทบาทอ้างอิงสำหรับการตรวจเฉพาะด้าน** ไม่ใช่เจ้าของคิวงาน และไม่ทำให้ implementation ต้องหยุดรอ
 
-ห้ามเลือกงานเองจากการเปิด repository แล้วหาไฟล์ที่น่าจะแก้
+## 2. Source of truth
 
-## 2. One task = one owner = one branch
+ก่อนทำงานให้ดูตามลำดับ:
 
-ทุก implementation task ต้องมี:
+1. `PROJECT_STATUS.md`
+2. `CURRENT_STATUS.md`
+3. `KNOWN_ISSUES.md`
+4. `NEXT_ACTIONS.md`
+5. `TEAM_WORKBOARD.md`
+6. verification/evidence ที่เกี่ยวข้อง
 
-- Task ID ที่ไม่ซ้ำ เช่น `NP-PAY-01`
-- Owner Agent เพียงหนึ่งตัว
-- Reviewer แยกได้ แต่ reviewer ห้ามแก้ scope เดียวกันพร้อม owner
-- Branch เฉพาะ task
-- File/area lock ที่ชัดเจน
-- Status ใน `TEAM_WORKBOARD.md`
+`TEAM_WORKBOARD.md` ใช้เพียงติดตามสถานะจริงและ branch ที่เปิดอยู่ ไม่ใช้สร้างขั้นตอนอนุมัติหลายชั้น
 
-งานที่ไม่มี Task ID + Owner + Branch + Status = **ยังไม่ได้รับอนุญาตให้เริ่ม**
+## 3. วิธีเดินงาน
 
-## 3. Work lock
+- เลือก blocker ที่กระทบ production/use-case มากที่สุดก่อน
+- งานที่ไม่ชนไฟล์หรือ dependency สามารถทำคู่ขนานบนคนละ branch
+- ไม่เพิ่ม feature ใหญ่จนกว่า reliability/security/core workflow สำคัญจะนิ่ง
+- ถ้าพบ defect ที่แก้ได้จาก repository และมี test รองรับ ให้แก้ทันที
+- ถ้าต้องใช้ credential, console access หรือ production data ที่ไม่มีสิทธิ์เข้าถึง ให้ทำส่วน repository ให้ครบแล้วระบุ external blocker แบบสั้นและชัด
 
-สถานะ `IN_PROGRESS` ถือเป็น lock ของ scope และไฟล์ที่ระบุใน `TEAM_WORKBOARD.md`
+## 4. Branch / PR / CI
 
-ทีมอื่นห้ามแก้ไฟล์/flow ที่ถูก lock เว้นแต่:
+การเปลี่ยน behavior, security, Firebase rules, data model, integration, performance หรือ deployment configuration ต้องใช้ branch + Pull Request
 
-1. Owner เดิมส่ง handoff อย่างชัดเจน หรือ
-2. `NIPON-LEAD-01` อนุมัติ scope split และแก้ Workboard ก่อนเริ่ม
+ก่อน merge ต้องมีอย่างน้อย:
 
-หากงานใหม่ต้องใช้ไฟล์ที่ถูก lock ให้ตั้งสถานะ `BLOCKED` และระบุ `Blocked By` แทนการแก้ไฟล์พร้อมกัน
+- tests ที่เกี่ยวข้องผ่าน
+- `npm run test:auth` ผ่าน
+- `npm run lint` ผ่าน
+- `npm run build` ผ่าน
+- ไม่มี secret/token/production personal data ใน diff
+- diff ไม่ทำ destructive migration โดยไม่มี backup/rollback
 
-## 4. Main branch protection by process
+Documentation-only status/coordination update สามารถ commit เข้า `main` ได้โดยตรงเมื่อไม่เปลี่ยน production behavior
 
-- ห้าม push behavior/security/data/deployment change เข้า `main` โดยตรง
-- ใช้ PR สำหรับ implementation, permissions, rules, integrations และ refactor
-- Documentation-only coordination update ทำบน `main` ได้เมื่อไม่เปลี่ยน production behavior
-- ผู้ merge เข้า `main` ควรเป็น `NIPON-LEAD-01` หรือ Integrator ที่ได้รับมอบหมาย
+## 5. Firebase / Production Safety
 
-## 5. Before merge
+- ห้ามลบหรือ migrate production data โดยไม่มี backup + reconciliation + rollback plan
+- ห้าม deploy Firestore/Storage rules ที่เปลี่ยน permission โดยไม่มี test/emulator หรือ isolated environment evidence
+- ห้ามใส่ API key, password, ID token, service-account JSON หรือ private key ใน Git/Markdown/log
+- ถ้า test ต้องใช้ external destination ให้ใช้ test-only destination; ถ้าไม่มีให้ระบุ `BLOCKED` แทนการใช้ข้อมูลจริง
 
-ทุก PR ที่เปลี่ยน code ต้อง:
+## 6. สถานะงาน
 
-- sync กับ `main` ล่าสุด
-- ตรวจ conflict กับ `TEAM_WORKBOARD.md`
-- รัน tests ที่เกี่ยวข้อง
-- รัน `npm run test:auth`
-- รัน `npm run lint`
-- รัน `npm run build`
-- ระบุ evidence ใน PR/handoff
-- ไม่มี secret, token หรือ production personal data ใน diff
+ใช้สถานะง่าย ๆ เท่านั้น:
 
-ถ้าแก้ Firebase/authorization ต้องมี emulator/test-environment evidence ก่อน production sign-off
+- `IN_PROGRESS` — กำลังทำ
+- `READY_TO_MERGE` — code/test ผ่านและรอ merge
+- `DONE` — merge แล้วและ evidence ครบตามขอบเขตที่ทำได้
+- `EXTERNAL_BLOCKED` — repository side ทำได้ครบแล้ว แต่ต้องใช้ console/credential/test environment ภายนอก
+- `BACKLOG` — ยังไม่ถึงลำดับ
 
-## 6. Handoff
+ห้ามใช้ `DONE` แทน production verification หากยังไม่ได้ทดสอบ runtime จริง
 
-เมื่อเปลี่ยน owner ต้องบันทึก:
+## 7. หลักตัดสินใจ
 
-- From / To Agent ID
-- Task ID
-- Scope ที่ทำเสร็จ
-- Scope ที่ยังไม่ทำ
-- Branch + commit ล่าสุด
-- Files/areas ที่ lock อยู่
-- Tests/evidence
-- Open risks
-- Next action
-
-จากนั้นแก้ `TEAM_WORKBOARD.md` ก่อน owner ใหม่เริ่มงาน
-
-## 7. Status lifecycle
-
-ใช้สถานะเหล่านี้เท่านั้น:
-
-`READY` → `IN_PROGRESS` → `REVIEW` → `DONE`
-
-สถานะเสริม:
-
-- `BLOCKED` — รอ dependency/approval
-- `PAUSED` — ตั้งใจพักและปลด file lock แล้ว
-- `CANCELLED` — ยกเลิกงาน
-
-`DONE` ต้องมี commit/PR/evidence อ้างอิงเสมอ
-
-## 8. Collision rule
-
-ถ้าพบ 2 ทีมกำลังแก้ scope เดียวกัน:
-
-1. หยุด merge ทั้งสองฝั่ง
-2. ใช้ Workboard ตัดสิน owner ปัจจุบัน
-3. owner ที่ไม่ได้ถือ lock เปลี่ยนเป็น `BLOCKED`
-4. Lead แยก scope หรือทำ handoff
-5. ห้ามแก้ conflict ด้วยการ force push เข้า `main`
-
-## 9. Current program constraint
-
-ช่วงนี้ห้ามเพิ่ม major feature ใหม่จนกว่า Core Workflow verification และ integration safety baseline จะผ่าน งานที่อนุญาตคือ blocker fixes, tests, reliability, security, integration verification และ UX consolidation ตามแผนเท่านั้น
+เป้าหมายคือ **ทำงานให้เสร็จเร็วที่สุดโดยไม่แลกกับข้อมูลเสียหายหรือ security regression**. การ review ใช้ CI, diff และ evidence เป็นหลัก ไม่สร้างคิว reviewer/agent เพิ่มโดยไม่จำเป็น
