@@ -2,7 +2,8 @@ import express from "express";
 import path from "path";
 import { Type } from "@google/genai";
 import dotenv from "dotenv";
-import { aiModels, createAiClient, getAiProviderName, isAiConfigured } from "./server/aiProvider.js";
+import { aiModels, createAiClient, getAiReadiness } from "./server/aiProvider.js";
+import { sendAiError } from "./server/aiErrors.js";
 import {
   requireActiveFirebaseAuth,
   requireAdminFirebaseAuth,
@@ -22,10 +23,12 @@ export async function createApp(options: { serveFrontend?: boolean } = {}) {
   app.use(express.json({ limit: "50mb" }));
 
   app.get("/api/health", (req, res) => {
+    const readiness = getAiReadiness();
     res.json({ 
       status: "ok",
-      aiProvider: getAiProviderName(),
-      aiReady: isAiConfigured()
+      aiProvider: (process.env.AI_PROVIDER || "gemini").toLowerCase(),
+      aiReady: readiness.ready,
+      aiStatus: readiness.ready ? "ready" : readiness.code
     });
   });
 
@@ -113,11 +116,9 @@ export async function createApp(options: { serveFrontend?: boolean } = {}) {
         return res.status(400).json({ error: "ไม่พบข้อมูลรูปภาพในคำขอ" });
       }
 
-      const apiKey = process.env.CENTRAL_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-
-      if (!apiKey) {
-        console.error("Server Error: No Gemini API Key defined in environment variables (checked CENTRAL_GEMINI_API_KEY and GEMINI_API_KEY)");
-        return res.status(500).json({ error: "เซิร์ฟเวอร์ยังไม่ได้ตั้งค่า API Key (โปรดตั้งค่า CENTRAL_GEMINI_API_KEY ใน Settings > Secrets)" });
+      const readiness = getAiReadiness();
+      if (!readiness.ready) {
+        return sendAiError(res, new Error(readiness.code || "AI_NOT_CONFIGURED"));
       }
 
       const ai = createAiClient();
@@ -299,26 +300,13 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
       try {
         result = JSON.parse(resultText);
       } catch (parseError) {
-        console.error(`JSON Parse Error with model ${successfullyUsedModel}. Raw response:`, resultText);
-        return res.status(500).json({ error: "รูปแบบข้อมูลที่ตอบกลับจาก AI ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง" });
+        console.error(`JSON Parse Error with model ${successfullyUsedModel}; responseLength=${resultText.length}`);
+        return sendAiError(res, new Error("JSON Parse Error"));
       }
 
       res.json(result);
     } catch (error: any) {
-      console.error("Server Analysis Error:", error);
-      
-      let friendlyError = "การวิเคราะห์ล้มเหลว โปรดตรวจสอบว่าบิลภาพชัดเจนหรือไม่";
-      const errorStr = String(error?.message || error);
-      
-      if (errorStr.includes("429") || errorStr.includes("RESOURCE_EXHAUSTED") || errorStr.includes("depleted")) {
-        friendlyError = "API Key ที่ใช้งานหมดโควต้า/เครดิต (Quota Exceeded) โปรดตรวจสอบผู้ให้บริการ AI ที่ตั้งค่าไว้";
-      } else if (errorStr.includes("API_KEY_INVALID")) {
-        friendlyError = "API Key ไม่ถูกต้อง โปรดตรวจสอบ API Key ในช่อง Settings > Secrets อีกครั้ง";
-      } else if (errorStr.includes("503") || errorStr.includes("UNAVAILABLE")) {
-        friendlyError = "ระบบเซิร์ฟเวอร์ AI มีผู้ใช้งานเป็นจำนวนมากในขณะนี้ กรุณากดปุ่มเพื่อลองใหม่อีกครั้ง";
-      }
-
-      res.status(500).json({ error: friendlyError, details: errorStr });
+      return sendAiError(res, error);
     }
   });
 
@@ -329,9 +317,9 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
         return res.status(400).json({ error: "Missing text to synthesize" });
       }
 
-      const apiKey = process.env.CENTRAL_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        return res.status(500).json({ error: "Gemini API key is not configured" });
+      const readiness = getAiReadiness();
+      if (!readiness.ready) {
+        return sendAiError(res, new Error(readiness.code || "AI_NOT_CONFIGURED"));
       }
 
       const ai = createAiClient();
@@ -358,8 +346,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
 
       res.json({ audio: base64Audio });
     } catch (err: any) {
-      console.error("TTS generation error:", err);
-      res.status(500).json({ error: err.message || "Failed to synthesize speech" });
+      return sendAiError(res, err);
     }
   });
 
@@ -929,10 +916,9 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
   app.post("/api/swine-ai-analyze", requireFirebaseAuth, async (req, res) => {
     const { image, sowId, sowTag, mode, prompt, textQuery } = req.body;
     try {
-      const apiKey = process.env.CENTRAL_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-      
-      if (!apiKey) {
-        throw new Error("API key missing");
+      const readiness = getAiReadiness();
+      if (!readiness.ready) {
+        return sendAiError(res, new Error(readiness.code || "AI_NOT_CONFIGURED"));
       }
 
       const ai = createAiClient();
@@ -1012,14 +998,7 @@ If you find any of the following abbreviations, short codes, or synonyms on the 
       });
 
     } catch (err: any) {
-      console.error("Swine AI Analyze Error:", err);
-      const isMissingKey = String(err?.message || err).includes("API key missing");
-      res.status(isMissingKey ? 503 : 500).json({
-        success: false,
-        error: isMissingKey
-          ? "ระบบ AI ยังไม่ได้ตั้งค่า API key"
-          : "ระบบ AI ไม่สามารถวิเคราะห์ได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง",
-      });
+      return sendAiError(res, err);
     }
   });
 
