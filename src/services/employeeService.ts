@@ -1,8 +1,9 @@
-import { collection, addDoc, onSnapshot, query, where, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, onSnapshot, query, where, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { SalaryAdvance, EmployeeBaseSalary, EmployeeTransaction } from '../types';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { OperationType, handleFirestoreError } from '../lib/firestore-error';
+import { assertNoDuplicateAdvanceSubmission, DuplicateAdvanceSubmissionError } from '../lib/payrollUtils';
 
 const SALARY_ADVANCES_COLLECTION = 'salary_advances';
 const SALARIES_COLLECTION = 'employee_salaries';
@@ -16,6 +17,16 @@ const getCurrentUserId = () => {
 export const addAdvance = async (amount: number, date: string) => {
   const userId = getCurrentUserId();
   try {
+    const existingSnapshot = await getDocs(query(
+      collection(db, SALARY_ADVANCES_COLLECTION),
+      where('userId', '==', userId),
+      where('date', '==', date),
+    ));
+    assertNoDuplicateAdvanceSubmission(
+      existingSnapshot.docs.map((advanceDoc) => ({ id: advanceDoc.id, ...advanceDoc.data() } as SalaryAdvance)),
+      { userId, amount, date },
+    );
+
     const docRef = await addDoc(collection(db, SALARY_ADVANCES_COLLECTION), {
       userId,
       amount,
@@ -26,6 +37,9 @@ export const addAdvance = async (amount: number, date: string) => {
     });
     return docRef.id;
   } catch (error) {
+    if (error instanceof DuplicateAdvanceSubmissionError) {
+      throw error;
+    }
     console.error("Error adding advance: ", error);
     handleFirestoreError(error, OperationType.CREATE, SALARY_ADVANCES_COLLECTION);
     throw error;
@@ -155,5 +169,3 @@ export const subscribeToUserMonthlyAdvances = (userId: string, monthDate: Date, 
     handleFirestoreError(error, OperationType.GET, SALARY_ADVANCES_COLLECTION);
   });
 };
-
-
