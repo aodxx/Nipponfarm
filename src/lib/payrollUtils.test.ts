@@ -4,6 +4,7 @@ import {
   assertNoDuplicateAdvanceSubmission,
   calculateNetSalary,
   DuplicateAdvanceSubmissionError,
+  getAdvanceSubmissionKey,
 } from './payrollUtils';
 import * as payrollUtils from './payrollUtils';
 import { SalaryAdvance } from '../types';
@@ -116,4 +117,15 @@ test('submit flow allows a non-duplicate candidate to continue to persistence', 
     [advance({ status: 'PENDING' })],
     { userId: 'staff-1', amount: 2500, date: '2026-09-11' },
   ));
+});
+
+test('creates a stable submission key from user, date, and normalized amount', () => {
+  assert.equal(
+    getAdvanceSubmissionKey({ userId: 'staff/1', amount: 2500, date: '2026-09-10' }),
+    'advance-staff%2F1-2026-09-10-2500.00',
+  );
+  assert.equal(
+    getAdvanceSubmissionKey({ userId: 'staff/1', amount: 2500.5, date: '2026-09-10' }),
+    'advance-staff%2F1-2026-09-10-2500.50',
+  );
 });

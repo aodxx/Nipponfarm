@@ -16,6 +16,10 @@ export interface PayrollCalculationResult {
 
 export type AdvanceSubmissionCandidate = Pick<SalaryAdvance, 'userId' | 'amount' | 'date'>;
 
+export const getAdvanceSubmissionKey = ({ userId, amount, date }: AdvanceSubmissionCandidate): string => (
+  `advance-${encodeURIComponent(userId)}-${date}-${amount.toFixed(2)}`
+);
+
 export class DuplicateAdvanceSubmissionError extends Error {
   constructor() {
     super('An identical active advance submission already exists');

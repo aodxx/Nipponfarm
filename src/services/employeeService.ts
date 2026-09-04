@@ -1,9 +1,9 @@
-import { collection, addDoc, getDocs, onSnapshot, query, where, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, onSnapshot, query, where, doc, setDoc, updateDoc, runTransaction } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { SalaryAdvance, EmployeeBaseSalary, EmployeeTransaction } from '../types';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { OperationType, handleFirestoreError } from '../lib/firestore-error';
-import { assertNoDuplicateAdvanceSubmission, DuplicateAdvanceSubmissionError } from '../lib/payrollUtils';
+import { assertNoDuplicateAdvanceSubmission, DuplicateAdvanceSubmissionError, getAdvanceSubmissionKey } from '../lib/payrollUtils';
 
 const SALARY_ADVANCES_COLLECTION = 'salary_advances';
 const SALARIES_COLLECTION = 'employee_salaries';
@@ -17,25 +17,45 @@ const getCurrentUserId = () => {
 export const addAdvance = async (amount: number, date: string) => {
   const userId = getCurrentUserId();
   try {
+    const submissionKey = getAdvanceSubmissionKey({ userId, amount, date });
+    const deterministicRef = doc(db, SALARY_ADVANCES_COLLECTION, submissionKey);
     const existingSnapshot = await getDocs(query(
       collection(db, SALARY_ADVANCES_COLLECTION),
       where('userId', '==', userId),
       where('date', '==', date),
     ));
-    assertNoDuplicateAdvanceSubmission(
-      existingSnapshot.docs.map((advanceDoc) => ({ id: advanceDoc.id, ...advanceDoc.data() } as SalaryAdvance)),
-      { userId, amount, date },
-    );
+    const existing = existingSnapshot.docs.map((advanceDoc) => ({ id: advanceDoc.id, ...advanceDoc.data() } as SalaryAdvance));
+    assertNoDuplicateAdvanceSubmission(existing, { userId, amount, date });
 
-    const docRef = await addDoc(collection(db, SALARY_ADVANCES_COLLECTION), {
-      userId,
-      amount,
-      date,
-      status: 'PENDING',
-      createdAt: Date.now(),
-      updatedAt: Date.now()
+    return await runTransaction(db, async (transaction) => {
+      const deterministicSnapshot = await transaction.get(deterministicRef);
+
+      const now = Date.now();
+      const data = {
+        userId,
+        amount,
+        date,
+        submissionKey,
+        status: 'PENDING' as const,
+        createdAt: now,
+        updatedAt: now,
+      };
+      if (deterministicSnapshot.exists()) {
+        assertNoDuplicateAdvanceSubmission(
+          [{ id: deterministicSnapshot.id, ...deterministicSnapshot.data() } as SalaryAdvance],
+          { userId, amount, date },
+        );
+        transaction.set(deterministicRef, data);
+      } else {
+        const rejectedLegacy = existingSnapshot.docs.find((advanceDoc) => advanceDoc.data().status === 'REJECTED');
+        if (rejectedLegacy) {
+          transaction.update(rejectedLegacy.ref, data);
+          return rejectedLegacy.id;
+        }
+        transaction.set(deterministicRef, data);
+      }
+      return submissionKey;
     });
-    return docRef.id;
   } catch (error) {
     if (error instanceof DuplicateAdvanceSubmissionError) {
       throw error;
