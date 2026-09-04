@@ -5,27 +5,43 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    function isSafeImage(maxBytes) {
+      return request.resource != null &&
+             request.resource.size <= maxBytes &&
+             request.resource.contentType.matches('image/.*');
+    }
+
     match /news/{allPaths=**} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn(); // In a real app, restrict to Admin, but for development we allow Staff
+      allow create, update: if isSignedIn() && isSafeImage(10 * 1024 * 1024);
+      allow delete: if isSignedIn();
     }
 
-    match /bills/{allPaths=**} {
-      allow read, write: if isSignedIn();
+    match /bills/{userId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && request.auth.uid == userId && isSafeImage(5 * 1024 * 1024);
+      allow delete: if isSignedIn() && request.auth.uid == userId;
     }
 
+    // Existing maintenance uploads currently use a flat maintenance/<file> path.
+    // Keep signed-in compatibility until the client migrates to maintenance/<uid>/<file>,
+    // but enforce image-only payloads and the same 10 MB limit as the UI.
     match /maintenance/{allPaths=**} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isSafeImage(10 * 1024 * 1024);
+      allow delete: if isSignedIn();
     }
 
     match /avatars/{userId}/{allPaths=**} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && request.auth.uid == userId;
+      allow create, update: if isSignedIn() && request.auth.uid == userId && isSafeImage(5 * 1024 * 1024);
+      allow delete: if isSignedIn() && request.auth.uid == userId;
     }
 
     match /profiles/{userId}/{allPaths=**} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && request.auth.uid == userId;
+      allow create, update: if isSignedIn() && request.auth.uid == userId && isSafeImage(5 * 1024 * 1024);
+      allow delete: if isSignedIn() && request.auth.uid == userId;
     }
 
     // Default deny
