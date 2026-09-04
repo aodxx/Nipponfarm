@@ -126,7 +126,17 @@
 - [x] เพิ่ม submit-flow tests และผ่าน 7/7
 - [x] ไม่เปลี่ยน Firestore rules และไม่แตะข้อมูล production
 
-ข้อจำกัด: query-before-add ป้องกัน retry ปกติ แต่ยังไม่ป้องกัน concurrent writes แบบ atomic; ต้องทำ consistency/idempotency ต่อไป
+ข้อจำกัดเดิม: query-before-add เพียงอย่างเดียวป้องกัน retry ปกติแต่ไม่ป้องกัน concurrent writes แบบ atomic; ได้ยกระดับใน progress ด้านล่างแล้ว
+
+### Progress: transaction-safe idempotency — เสร็จแล้ว
+
+- [x] เพิ่ม deterministic `submissionKey` จาก user/date/amount
+- [x] ใช้ Firestore transaction อ่าน/เขียน deterministic document เดียวเพื่อป้องกัน concurrent duplicate ของ submission ใหม่
+- [x] รักษา legacy records เดิมโดยไม่ลบหรือ migrate และตรวจ duplicate ก่อนเขียน
+- [x] เพิ่ม tests ของ key normalization และ transaction decision behavior
+- [x] payroll tests 8/8, authorization tests 5/5, lint และ build ผ่าน
+
+ข้อจำกัด: รายการเก่าที่ไม่มี `submissionKey` ยังต้องผ่าน legacy lookup; ยังต้องเพิ่ม audit trail และทดสอบ emulator/production test account ก่อนถือว่า payroll production-ready
 
 1. เพิ่ม unit tests สูตร advance/payroll และ net salary
 2. กำหนด transaction identity/idempotency สำหรับ request, approval และ payslip

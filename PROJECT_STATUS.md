@@ -65,4 +65,10 @@ Task 1 เสร็จในระดับเอกสารและ static co
 
 เชื่อม duplicate advance guard เข้ากับ `employeeService.addAdvance` และ `AdvanceRequest` แล้ว โดย query รายการของ user/date ก่อนเขียน และปฏิเสธรายการที่มี user, amount และ date เดียวกันในสถานะ `PENDING` หรือ `APPROVED`; รายการ `REJECTED` สามารถส่งใหม่ได้. Payroll utility และ submit-flow tests ผ่าน 7/7, authorization regression ผ่าน 5/5, lint และ build ผ่าน.
 
-ข้อจำกัดที่ยังเปิดอยู่: query-before-add ลด duplicate จาก retry ปกติ แต่ยังไม่รับประกัน concurrent writes แบบ atomic transaction. ต้องทำเป็นงาน consistency/idempotency ถัดไปก่อนถือว่า payroll production-ready และยังไม่มีการเปลี่ยน Firestore rules หรือข้อมูล production.
+ข้อจำกัดที่ยังเปิดอยู่: รายการ legacy ที่ไม่มี `submissionKey` ยังต้องผ่าน legacy lookup และยังไม่มี audit trail/production test-account evidence ครบ. งาน consistency/idempotency ใช้ transaction กับ deterministic document สำหรับ submission ใหม่แล้ว โดยยังไม่มีการเปลี่ยน Firestore rules หรือข้อมูล production.
+
+## Payroll Idempotency Progress — 4 กันยายน 2026
+
+ยกระดับ duplicate prevention ของ advance submission เป็น transaction-safe สำหรับรายการใหม่ โดยสร้าง deterministic `submissionKey` จาก user/date/amount และใช้ Firestore transaction อ่าน/เขียน document เดียวกัน ทำให้ concurrent submissions ของ candidate เดียวกันชนกันที่ document key เดียวกัน. รายการเก่าที่ไม่มี key ยังรองรับผ่าน legacy lookup โดยไม่ทำ destructive migration.
+
+ผล validation ล่าสุด: payroll utility/idempotency tests ผ่าน 8/8, authorization regression ผ่าน 5/5, lint และ build ผ่าน.
