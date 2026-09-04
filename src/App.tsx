@@ -12,7 +12,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 
 const TodayDashboard = lazy(() => import('./pages/TodayDashboard'));
 const DashboardLegacy = lazy(() => import('./pages/Dashboard'));
-const SowList = lazy(() => import('./pages/SowList'));
+const SowList = lazy(() => import('./pages/FarmHub'));
 const AddSow = lazy(() => import('./pages/AddSow'));
 const SowDetails = lazy(() => import('./pages/SowDetails'));
 const ScanAI = lazy(() => import('./pages/ScanAI'));
