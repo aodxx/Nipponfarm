@@ -1,4 +1,4 @@
-import { collection, onSnapshot, query, orderBy, doc, getDoc, deleteDoc, getDocs, limit, where, runTransaction } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, getDoc, getDocs, limit, where, runTransaction } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { PigSale } from '../types';
 import { OperationType, handleFirestoreError } from '../lib/firestore-error';
@@ -21,9 +21,10 @@ export const getRecentBuyers = async (): Promise<{name: string, email: string, v
     );
     const snap = await getDocs(q);
     const buyersMap = new Map<string, {name: string, email: string, vehicleReg: string}>();
-    
+
     snap.docs.forEach(doc => {
       const data = doc.data();
+      if (data.recordStatus === 'VOID') return;
       if (data.buyerName && !buyersMap.has(data.buyerName)) {
         buyersMap.set(data.buyerName, {
           name: data.buyerName,
@@ -34,7 +35,7 @@ export const getRecentBuyers = async (): Promise<{name: string, email: string, v
     });
     return Array.from(buyersMap.values());
   } catch (error) {
-    console.error("Error fetching buyers: ", error);
+    console.error('Error fetching buyers: ', error);
     return [];
   }
 };
@@ -42,7 +43,6 @@ export const getRecentBuyers = async (): Promise<{name: string, email: string, v
 export const savePigSale = async (saleData: Omit<PigSale, 'id' | 'userId' | 'createdAt'>, recordedBy: string) => {
   const userId = getCurrentUserId();
   try {
-    // Compatibility check for records created before deterministic sale document IDs.
     const legacyMatch = await getDocs(query(
       collection(db, PIG_SALES_COLLECTION),
       where('userId', '==', userId),
@@ -60,6 +60,7 @@ export const savePigSale = async (saleData: Omit<PigSale, 'id' | 'userId' | 'cre
 
       transaction.set(saleRef, {
         ...saleData,
+        recordStatus: 'ACTIVE',
         recordedBy,
         userId,
         createdAt: Date.now()
@@ -72,10 +73,16 @@ export const savePigSale = async (saleData: Omit<PigSale, 'id' | 'userId' | 'cre
   }
 };
 
-export const subscribeToPigSales = (callback: (sales: PigSale[]) => void) => {
+export const subscribeToPigSales = (
+  callback: (sales: PigSale[]) => void,
+  options: { includeVoided?: boolean } = {},
+) => {
   const q = query(collection(db, PIG_SALES_COLLECTION), orderBy('createdAt', 'desc'));
   return onSnapshot(q, (snapshot) => {
-    callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PigSale)));
+    const sales = snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() } as PigSale & { recordStatus?: 'ACTIVE' | 'VOID' }))
+      .filter(sale => options.includeVoided || sale.recordStatus !== 'VOID');
+    callback(sales);
   }, (error) => {
     handleFirestoreError(error, OperationType.GET, PIG_SALES_COLLECTION);
   });
@@ -90,10 +97,30 @@ export const getPigSaleById = async (id: string): Promise<PigSale | null> => {
   return null;
 };
 
-export const deletePigSale = async (id: string) => {
+export const voidPigSale = async (id: string, reason: string = 'VOIDED_FROM_SALES_HISTORY') => {
+  const actorUid = getCurrentUserId();
+  const saleRef = doc(db, PIG_SALES_COLLECTION, id);
   try {
-    await deleteDoc(doc(db, PIG_SALES_COLLECTION, id));
+    await runTransaction(db, async (transaction) => {
+      const existing = await transaction.get(saleRef);
+      if (!existing.exists()) throw new Error('Pig sale not found');
+      if (existing.data().recordStatus === 'VOID') return;
+
+      transaction.update(saleRef, {
+        recordStatus: 'VOID',
+        voidReason: reason.trim() || 'VOIDED_FROM_SALES_HISTORY',
+        voidedAt: Date.now(),
+        voidedBy: actorUid,
+        updatedAt: Date.now(),
+      });
+    });
   } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, `${PIG_SALES_COLLECTION}/${id}`);
+    handleFirestoreError(error, OperationType.UPDATE, `${PIG_SALES_COLLECTION}/${id}`);
+    throw error;
   }
+};
+
+// Compatibility alias for existing UI callers. This intentionally does not delete data.
+export const deletePigSale = async (id: string) => {
+  return voidPigSale(id, 'LEGACY_DELETE_ACTION');
 };
