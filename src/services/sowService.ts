@@ -1,4 +1,4 @@
-import { collection, addDoc, onSnapshot, query, orderBy, doc, getDocs, writeBatch, where } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, doc, getDocs, writeBatch, where } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { Sow, SowEvent, Task, EventType } from '../types';
 import { OperationType, handleFirestoreError } from '../lib/firestore-error';
@@ -19,7 +19,7 @@ export const addSow = async (sowData: Omit<Sow, 'id' | 'status' | 'parity' | 'cr
   const userId = getCurrentUserId();
   const newSow: Omit<Sow, 'id'> = {
     ...sowData,
-    type: sowData.type || 'SOW', // Default to SOW
+    type: sowData.type || 'SOW',
     userId,
     status: 'IDLE',
     parity: 0,
@@ -27,7 +27,7 @@ export const addSow = async (sowData: Omit<Sow, 'id' | 'status' | 'parity' | 'cr
     createdAt: now,
     updatedAt: now,
   };
-  
+
   try {
     const docRef = await addDoc(collection(db, SOWS_COLLECTION), newSow);
     return docRef.id;
@@ -39,7 +39,9 @@ export const addSow = async (sowData: Omit<Sow, 'id' | 'status' | 'parity' | 'cr
 export const subscribeToSows = (callback: (sows: Sow[]) => void, errorCallback?: (error: any) => void) => {
   const q = query(collection(db, SOWS_COLLECTION));
   return onSnapshot(q, (snapshot) => {
-    const sows = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sow));
+    const sows = snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() } as Sow))
+      .filter(sow => sow.status !== 'CULLED');
     sows.sort((a, b) => b.createdAt - a.createdAt);
     callback(sows);
   }, (error) => {
@@ -47,8 +49,6 @@ export const subscribeToSows = (callback: (sows: Sow[]) => void, errorCallback?:
     handleFirestoreError(error, OperationType.GET, SOWS_COLLECTION);
   });
 };
-
-
 
 export const subscribeToSow = (sowId: string, callback: (sow: Sow | null) => void, errorCallback?: (error: any) => void) => {
   return onSnapshot(doc(db, SOWS_COLLECTION, sowId), (docSnap) => {
@@ -67,7 +67,6 @@ export const subscribeToSowEvents = (sowId: string, callback: (events: SowEvent[
   const q = query(collection(db, EVENTS_COLLECTION), where('sowId', '==', sowId));
   return onSnapshot(q, (snapshot) => {
     const events = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SowEvent));
-    // Sort by date DESC, then createdAt DESC
     events.sort((a, b) => {
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
@@ -106,10 +105,7 @@ export const subscribeToAllPendingTasks = (callback: (tasks: Task[]) => void, er
 };
 
 export const getActiveBoars = async (): Promise<Sow[]> => {
-  const q = query(
-    collection(db, SOWS_COLLECTION),
-    where('type', '==', 'BOAR')
-  );
+  const q = query(collection(db, SOWS_COLLECTION), where('type', '==', 'BOAR'));
   const snapshot = await getDocs(q);
   const boars = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sow));
   return boars.filter(b => b.status !== 'CULLED');
@@ -149,24 +145,59 @@ export const recordEvent = async (sow: Sow, eventType: EventType, date: string, 
   const userId = getCurrentUserId();
 
   try {
-    // If CULL, completely delete the sow, its events, and its tasks
     if (eventType === 'CULL') {
+      if (!sow.id) throw new Error('Cannot remove sow without document ID');
+
+      const removalDetails = {
+        ...details,
+        removalType: details?.removalType || 'CULL',
+        removalReason: details?.removalReason || details?.reason || null,
+        previousStatus: sow.status,
+        parityAtRemoval: sow.parity,
+      };
+
+      const removalEventRef = doc(collection(db, EVENTS_COLLECTION));
+      batch.set(removalEventRef, {
+        userId,
+        sowId: sow.id,
+        type: 'CULL',
+        date,
+        parity: sow.parity,
+        details: removalDetails,
+        videoUrl: videoUrl || null,
+        recordedBy: recordedBy || 'Unknown',
+        createdAt: now,
+      });
+
       const tasksQ = query(collection(db, TASKS_COLLECTION), where('sowId', '==', sow.id));
       const tasksSnap = await getDocs(tasksQ);
-      tasksSnap.docs.forEach(tDoc => batch.delete(tDoc.ref));
+      tasksSnap.docs.forEach(tDoc => {
+        const task = tDoc.data();
+        if (task.status === 'PENDING') {
+          batch.update(tDoc.ref, {
+            status: 'CANCELLED',
+            cancelledAt: now,
+            cancellationReason: 'SOW_REMOVED',
+          });
+        }
+      });
 
-      const eventsQ = query(collection(db, EVENTS_COLLECTION), where('sowId', '==', sow.id));
-      const eventsSnap = await getDocs(eventsQ);
-      eventsSnap.docs.forEach(eDoc => batch.delete(eDoc.ref));
-
-      const sowRef = doc(db, SOWS_COLLECTION, sow.id!);
-      batch.delete(sowRef);
+      const sowRef = doc(db, SOWS_COLLECTION, sow.id);
+      batch.update(sowRef, {
+        status: 'CULLED',
+        penId: null,
+        removedAt: now,
+        removedDate: date,
+        removedBy: userId,
+        removalType: removalDetails.removalType,
+        removalReason: removalDetails.removalReason,
+        updatedAt: now,
+      });
 
       await batch.commit();
       return;
     }
 
-    // 1. Add Event (or overwrite existing draft document)
     const eventRef = draftDocId ? doc(db, EVENTS_COLLECTION, draftDocId) : doc(collection(db, EVENTS_COLLECTION));
     batch.set(eventRef, {
       userId,
@@ -177,34 +208,31 @@ export const recordEvent = async (sow: Sow, eventType: EventType, date: string, 
       details,
       videoUrl: videoUrl || null,
       recordedBy: recordedBy || 'Unknown',
-      createdAt: now
+      createdAt: now,
     });
 
-    // 2. Calculate next state
     let engineEventType: any = eventType;
     if (eventType === 'ULTRASOUND') {
       if (details.result === 'POSITIVE') engineEventType = 'ULTRASOUND_POS';
       else if (details.result === 'NEGATIVE') engineEventType = 'ULTRASOUND_NEG';
       else if (details.result === 'ABORTION') engineEventType = 'ABORTION';
     }
-    
+
     const { status: newStatus, parity: newParity } = calculateNextSowState(sow.status, sow.parity, engineEventType);
 
-    // 3. Update Sow
     const sowRef = doc(db, SOWS_COLLECTION, sow.id!);
     batch.update(sowRef, { status: newStatus, parity: newParity, updatedAt: now });
 
-    // 4. Complete related task if any
     let taskTypeToComplete = '';
     if (relatedTaskId) {
       const taskRef = doc(db, TASKS_COLLECTION, relatedTaskId);
       batch.update(taskRef, { status: 'COMPLETED' });
     } else {
-      if (eventType === 'BREED') taskTypeToComplete = 'BREED'; 
+      if (eventType === 'BREED') taskTypeToComplete = 'BREED';
       if (eventType === 'ULTRASOUND') taskTypeToComplete = 'ULTRASOUND';
       if (eventType === 'FARROW') taskTypeToComplete = 'FARROW';
       if (eventType === 'WEAN') taskTypeToComplete = 'WEAN';
-      
+
       if (taskTypeToComplete) {
         const pendingTasksQ = query(collection(db, TASKS_COLLECTION), where('sowId', '==', sow.id));
         const pendingTasksSnap = await getDocs(pendingTasksQ);
@@ -217,25 +245,21 @@ export const recordEvent = async (sow: Sow, eventType: EventType, date: string, 
       }
     }
 
-    // Cancel other pending tasks if aborted or heat return
     if (eventType === 'HEAT_RETURN' || (eventType === 'ULTRASOUND' && details.result !== 'POSITIVE')) {
       const allPendingQ = query(collection(db, TASKS_COLLECTION), where('sowId', '==', sow.id));
       const allPendingSnap = await getDocs(allPendingQ);
       allPendingSnap.docs.forEach(tDoc => {
         const data = tDoc.data();
-        // Don't cancel the task we just completed
         if (data.status === 'PENDING' && tDoc.id !== relatedTaskId && data.type !== taskTypeToComplete) {
           batch.update(tDoc.ref, { status: 'CANCELLED' });
         }
       });
     }
 
-    // 5. Generate new tasks
     let newTasks: Omit<Task, 'id'>[] = [];
     if (eventType === 'BREED') {
       newTasks = generateTasksForBreed(date, sow.id!, sow.sowId, userId);
     } else if (eventType === 'ULTRASOUND' && details.result === 'POSITIVE') {
-      // Find and delete any outstanding draft MOVE_TO_FARROW and FARROW tasks for this sow
       const draftTasksQ = query(collection(db, TASKS_COLLECTION), where('sowId', '==', sow.id));
       const draftTasksSnap = await getDocs(draftTasksQ);
       draftTasksSnap.docs.forEach(tDoc => {
@@ -251,7 +275,7 @@ export const recordEvent = async (sow: Sow, eventType: EventType, date: string, 
         .map(doc => doc.data() as SowEvent)
         .filter(ev => ev.type === 'BREED')
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
+
       const breedDate = breedEvents.length > 0 ? breedEvents[0].date : date;
       newTasks = generateTasksForPregnant(breedDate, sow.id!, sow.sowId, userId);
     } else if (eventType === 'FARROW') {
