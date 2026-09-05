@@ -1,33 +1,36 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // [HELPERS]
     function isSignedIn() { return request.auth != null; }
-    
-    function isAdmin() { 
+
+    function isAdmin() {
       return isSignedIn() && (
-        ('email' in request.auth.token && request.auth.token.email.lower() == 'panaod3826@gmail.com') || 
+        ('email' in request.auth.token && request.auth.token.email.lower() == 'panaod3826@gmail.com') ||
         ('email' in request.auth.token && request.auth.token.email.lower() == 'pantipa3826@gmail.com') ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN')
-      ); 
+      );
     }
 
     function isActiveUser() {
       return isSignedIn() && (
-        ('email' in request.auth.token && request.auth.token.email.lower() == 'panaod3826@gmail.com') || 
+        ('email' in request.auth.token && request.auth.token.email.lower() == 'panaod3826@gmail.com') ||
         ('email' in request.auth.token && request.auth.token.email.lower() == 'pantipa3826@gmail.com') ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['ADMIN', 'STAFF'])
       );
     }
-    
+
+    function currentUserRole() {
+      return isAdmin()
+        ? 'ADMIN'
+        : get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
-    function ownerIsUnchanged() {
-      return incoming().userId == existing().userId;
-    }
+    function ownerIsUnchanged() { return incoming().userId == existing().userId; }
     function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
 
     function canCreateOwnUser(userId) {
@@ -46,17 +49,10 @@ service cloud.firestore {
              incoming().role == existing().role &&
              incoming().createdAt == existing().createdAt &&
              incoming().diff(existing()).affectedKeys().hasOnly([
-               'displayName',
-               'phone',
-               'lineId',
-               'address',
-               'emergencyContact',
-               'bankAccount',
-               'photoURL'
+               'displayName', 'phone', 'lineId', 'address', 'emergencyContact', 'bankAccount', 'photoURL'
              ]);
     }
 
-    // [VALIDATION BOILERPLATE]
     function isValidMaintenance(data) {
       return data.keys().hasAll(['userId', 'title', 'location', 'status', 'urgency', 'createdAt']) &&
              data.userId is string && data.title is string && data.title.size() <= 500 &&
@@ -102,16 +98,14 @@ service cloud.firestore {
              data.userId is string && data.userId.size() <= 128 &&
              data.billId is string && data.billId.size() <= 128 &&
              data.description is string && data.description.size() <= 500 &&
-             data.quantity is number &&
-             data.total is number &&
+             data.quantity is number && data.total is number &&
              data.date is string && data.date.size() <= 64;
     }
 
     function isValidPigPrice(data) {
       return data.keys().hasAll(['userId', 'year', 'month', 'price', 'recordedBy', 'createdAt']) &&
              data.userId is string && data.userId.size() <= 128 &&
-             data.year is number &&
-             data.month is number && data.month >= 1 && data.month <= 12 &&
+             data.year is number && data.month is number && data.month >= 1 && data.month <= 12 &&
              data.price is number && data.price >= 0 &&
              data.recordedBy is string && data.recordedBy.size() <= 200 &&
              data.createdAt is number &&
@@ -120,10 +114,7 @@ service cloud.firestore {
 
     function isValidHistoricalPigPrice(data) {
       return data.keys().hasAll(['year', 'months', 'avg']) &&
-             data.keys().size() == 3 &&
-             data.year is number &&
-             data.avg is number &&
-             data.months is map;
+             data.keys().size() == 3 && data.year is number && data.avg is number && data.months is map;
     }
 
     function isValidPayrollAudit(data) {
@@ -138,58 +129,76 @@ service cloud.firestore {
              data.occurredAt is number && data.createdAt is number;
     }
 
-    // Default deny
+    function isValidAuditEvent(data) {
+      return data.keys().hasAll([
+               'farmId', 'actorUid', 'actorRoleSnapshot', 'action', 'targetDomain',
+               'targetCollection', 'targetId', 'previous', 'next', 'source', 'occurredAt', 'schemaVersion'
+             ]) &&
+             data.farmId is string && data.farmId.size() <= 128 &&
+             data.actorUid == request.auth.uid &&
+             data.actorRoleSnapshot == currentUserRole() &&
+             data.action in [
+               'ROLE_PERMISSION_CHANGED', 'SOW_LIFECYCLE_CORRECTED', 'SOW_REMOVED', 'SALE_VOIDED',
+               'PAYMENT_RECORDED', 'PAYMENT_CORRECTED', 'PAYROLL_CLOSED', 'PAYROLL_REOPENED',
+               'ADVANCE_APPROVED', 'ADVANCE_PAID', 'ADVANCE_REPAYMENT_CHANGED', 'AI_DECISION_CONFIRMED',
+               'MIGRATION_APPLIED', 'RECONCILIATION_RESOLVED'
+             ] &&
+             data.targetDomain in ['BREEDING', 'SALES', 'PAYROLL', 'FINANCE', 'MAINTENANCE', 'USERS', 'SYSTEM'] &&
+             data.targetCollection is string && data.targetCollection.size() <= 128 &&
+             data.targetId is string && data.targetId.size() <= 128 &&
+             data.previous is map && data.next is map &&
+             data.source in ['UI', 'SYSTEM', 'AI_CONFIRMATION', 'MIGRATION', 'ADMIN_TOOL'] &&
+             data.occurredAt is number && data.schemaVersion == 1 &&
+             (!('reason' in data) || (data.reason is string && data.reason.size() <= 1000)) &&
+             (!('correlationId' in data) || (data.correlationId is string && data.correlationId.size() <= 128));
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Connection test
     match /test/connection {
       allow read: if true;
     }
 
-    // Users
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if canCreateOwnUser(userId);
       allow update: if isAdmin() || canSelfUpdateUser(userId);
     }
 
-    // News Posts
     match /news_posts/{postId} {
       allow list: if isSignedIn();
       allow get: if isSignedIn();
       allow create: if isAdmin() && isValidNewsPost(incoming()) && incoming().userId == request.auth.uid;
-      allow update: if (isAdmin() && isValidNewsPost(incoming())) || 
+      allow update: if (isAdmin() && isValidNewsPost(incoming())) ||
                     (isSignedIn() && incoming().diff(existing()).affectedKeys().hasOnly(['likedBy']));
       allow delete: if isAdmin();
     }
 
-    // Manuals (คลังความรู้)
     match /manuals/{manualId} {
       allow list, get: if isSignedIn();
       allow create, update: if isAdmin() && isValidManual(incoming());
       allow delete: if isAdmin();
     }
 
-    // Farm Core Data
-    match /sows/{documentId} { 
-      allow read, create, update: if isActiveUser(); 
+    match /sows/{documentId} {
+      allow read, create, update: if isActiveUser();
       allow delete: if isAdmin();
     }
-    match /events/{documentId} { 
-      allow read, create, update: if isActiveUser(); 
+    match /events/{documentId} {
+      allow read, create, update: if isActiveUser();
       allow delete: if isAdmin();
     }
-    match /tasks/{documentId} { 
-      allow read, create, update: if isActiveUser(); 
+    match /tasks/{documentId} {
+      allow read, create, update: if isActiveUser();
       allow delete: if isAdmin();
     }
-    match /pig_sales/{documentId} { 
-      allow read, create, update: if isActiveUser(); 
+    match /pig_sales/{documentId} {
+      allow read, create, update: if isActiveUser();
       allow delete: if isAdmin();
     }
-    match /maintenance_requests/{documentId} { 
+    match /maintenance_requests/{documentId} {
       allow read: if isActiveUser();
       allow create: if isActiveUser() && isValidMaintenance(incoming()) && incoming().userId == request.auth.uid;
       allow update: if isActiveUser() && isValidMaintenance(incoming()) && (
@@ -197,15 +206,13 @@ service cloud.firestore {
       );
       allow delete: if isAdmin();
     }
-    
-    // Communications
+
     match /chat_rooms/{documentId} { allow read, write: if isActiveUser(); }
     match /chat_messages/{documentId} { allow read, write: if isActiveUser(); }
-    
-    // Payroll (Strictly Admin for most, but active staff can read own and request advance)
+
     match /employee_transactions/{documentId} { allow read, write: if isAdmin(); }
     match /EmployeeTransaction/{documentId} { allow read, write: if isAdmin(); }
-    match /employee_salaries/{documentId} { 
+    match /employee_salaries/{documentId} {
       allow read: if isAdmin() || (isActiveUser() && documentId == request.auth.uid);
       allow write: if isAdmin();
     }
@@ -224,8 +231,12 @@ service cloud.firestore {
       allow create: if isAdmin() && isValidPayrollAudit(incoming()) && incoming().actorUid == request.auth.uid;
     }
 
-    // AI Bills & Scan
-    match /bills/{documentId} { 
+    match /audit_events/{documentId} {
+      allow read: if isAdmin();
+      allow create: if isActiveUser() && isValidAuditEvent(incoming());
+    }
+
+    match /bills/{documentId} {
       allow read: if isActiveUser();
       allow create: if isActiveUser() && isValidBill(incoming()) && incoming().userId == request.auth.uid;
       allow update: if isActiveUser() && isValidBill(incoming()) && (
@@ -233,7 +244,7 @@ service cloud.firestore {
       );
       allow delete: if isAdmin();
     }
-    match /bill_items/{documentId} { 
+    match /bill_items/{documentId} {
       allow read: if isActiveUser();
       allow create: if isActiveUser() && isValidBillItem(incoming()) && incoming().userId == request.auth.uid;
       allow update: if isActiveUser() && isValidBillItem(incoming()) && (
@@ -242,8 +253,7 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Tools
-    match /feed_recipes/{documentId} { 
+    match /feed_recipes/{documentId} {
       allow read: if isActiveUser();
       allow create, update: if isActiveUser() && isValidFeedRecipe(incoming());
       allow delete: if isAdmin();
@@ -266,12 +276,10 @@ service cloud.firestore {
       allow delete: if isAdmin() && isValidId(documentId);
     }
 
-    // Farm Settings & Metadata
     match /farm_settings/{documentId} {
       allow read, write: if isActiveUser();
     }
 
-    // Master Ingredients
     match /master_ingredients/{documentId} {
       allow read, write: if isActiveUser();
     }
