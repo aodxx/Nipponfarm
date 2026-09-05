@@ -1,19 +1,20 @@
 import type { ComponentType } from 'react';
 import { AlertTriangle, CalendarDays, Camera, ChevronRight, CircleDollarSign, ClipboardList, PiggyBank, Plus, Receipt, Wrench } from 'lucide-react';
 import { isPast, isToday, parseISO } from 'date-fns';
+import type { UnifiedWorkItem } from '../../lib/taskEngine';
 
 type Navigate = (to: string) => void;
 type IconType = ComponentType<{ className?: string }>;
 
 export function TodaySummarySection({
+  exceptionCount,
   overdueCount,
   todayCount,
-  activeSowCount,
   navigate,
 }: {
+  exceptionCount: number;
   overdueCount: number;
   todayCount: number;
-  activeSowCount: number;
   navigate: Navigate;
 }) {
   return (
@@ -22,16 +23,16 @@ export function TodaySummarySection({
         <div>
           <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">วันนี้ต้องทำอะไร</p>
           <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">งานสำคัญของฟาร์มวันนี้</h2>
-          <p className="mt-1 text-sm text-slate-500 dark:text-white/60">เริ่มจากงานค้างและงานถึงกำหนด ก่อนเปิดรายงานหรือเครื่องมืออื่น</p>
+          <p className="mt-1 text-sm text-slate-500 dark:text-white/60">เริ่มจากเหตุผิดปกติ งานค้าง และงานถึงกำหนดก่อน</p>
         </div>
         <button onClick={() => navigate('/calendar')} className="flex min-h-11 shrink-0 items-center gap-2 rounded-2xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-800 active:scale-95 dark:bg-white/10 dark:text-white">
           <CalendarDays className="h-5 w-5" /> ปฏิทิน
         </button>
       </div>
       <div className="mt-5 grid grid-cols-3 gap-3">
-        <SummaryCard label="เกินกำหนด" value={overdueCount} tone="danger" />
-        <SummaryCard label="วันนี้" value={todayCount} tone="warning" />
-        <SummaryCard label="แม่พันธุ์ใช้งาน" value={activeSowCount} tone="normal" />
+        <SummaryCard label="ต้องระวัง" value={exceptionCount} tone="danger" />
+        <SummaryCard label="เกินกำหนด" value={overdueCount} tone="warning" />
+        <SummaryCard label="วันนี้" value={todayCount} tone="normal" />
       </div>
     </section>
   );
@@ -53,7 +54,7 @@ export function UrgentTasksSection({
   navigate,
 }: {
   loading: boolean;
-  urgentTasks: any[];
+  urgentTasks: UnifiedWorkItem[];
   navigate: Navigate;
 }) {
   return (
@@ -61,33 +62,43 @@ export function UrgentTasksSection({
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <h3 className="font-black text-slate-950 dark:text-white">ต้องจัดการก่อน</h3>
-          <p className="text-xs text-slate-500 dark:text-white/50">งานเกินกำหนดและงานวันนี้</p>
+          <p className="text-xs text-slate-500 dark:text-white/50">เหตุผิดปกติ งานเกินกำหนด และงานวันนี้</p>
         </div>
-        <button onClick={() => navigate('/calendar')} className="text-sm font-bold text-cyan-700 dark:text-cyan-300">ดูทั้งหมด</button>
+        <button onClick={() => navigate('/calendar')} className="text-sm font-bold text-cyan-700 dark:text-cyan-300">ดูปฏิทิน</button>
       </div>
       {loading ? (
-        <div className="py-8 text-center text-sm font-semibold text-slate-400">กำลังโหลดงานวันนี้...</div>
+        <div className="py-8 text-center text-sm font-semibold text-slate-400">กำลังโหลดคิวงาน...</div>
       ) : urgentTasks.length === 0 ? (
         <div className="rounded-2xl bg-emerald-50 px-4 py-6 text-center dark:bg-emerald-500/10">
-          <p className="font-black text-emerald-800 dark:text-emerald-300">ไม่มีงานค้างหรือครบกำหนดวันนี้</p>
+          <p className="font-black text-emerald-800 dark:text-emerald-300">ไม่มีเหตุผิดปกติหรืองานเร่งด่วน</p>
           <p className="mt-1 text-sm text-emerald-700/70 dark:text-emerald-300/60">คุณสามารถเริ่มงานใหม่จากทางลัดด้านล่างได้</p>
         </div>
       ) : (
         <div className="space-y-2">
           {urgentTasks.map((task) => {
-            const overdue = task?.dueDate && isPast(parseISO(task.dueDate)) && !isToday(parseISO(task.dueDate));
+            const overdue = Boolean(task.dueDate && isPast(parseISO(task.dueDate)) && !isToday(parseISO(task.dueDate)));
+            const today = Boolean(task.dueDate && isToday(parseISO(task.dueDate)));
+            const badge = task.kind === 'EXCEPTION' ? 'ต้องระวัง' : overdue ? 'เกินกำหนด' : today ? 'วันนี้' : task.priority === 'HIGH' ? 'สำคัญ' : 'งานฟาร์ม';
+            const badgeClass = task.kind === 'EXCEPTION' || task.priority === 'CRITICAL'
+              ? 'text-rose-600'
+              : overdue
+                ? 'text-orange-600'
+                : 'text-amber-600';
+
             return (
               <button
                 key={task.id}
-                onClick={() => task.sowId ? navigate(`/sows/${task.sowId}`) : navigate('/calendar')}
+                onClick={() => navigate(task.route || '/calendar')}
                 className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-100 p-4 text-left active:scale-[0.99] dark:border-white/5"
               >
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className={overdue ? 'text-xs font-black text-rose-600' : 'text-xs font-black text-amber-600'}>{overdue ? 'เกินกำหนด' : 'วันนี้'}</span>
-                    <span className="text-xs text-slate-400">{task.dueDate}</span>
+                    <span className={`text-xs font-black ${badgeClass}`}>{badge}</span>
+                    <span className="text-xs font-bold text-slate-400">{task.source === 'MAINTENANCE' ? 'ซ่อมบำรุง' : 'แม่พันธุ์'}</span>
+                    {task.dueDate && <span className="text-xs text-slate-400">{task.dueDate}</span>}
                   </div>
-                  <p className="mt-1 truncate font-bold text-slate-900 dark:text-white">{task.title || task.type || 'งานฟาร์ม'}</p>
+                  <p className="mt-1 truncate font-bold text-slate-900 dark:text-white">{task.title}</p>
+                  <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-white/45">{task.reason}</p>
                 </div>
                 <ChevronRight className="h-5 w-5 shrink-0 text-slate-300" />
               </button>
