@@ -165,8 +165,8 @@ try {
   await assertSucceeds(updateDoc(doc(adminDb, 'salary_advances', 'staff-advance'), { status: 'APPROVED', updatedAt: 2 }));
   await assertSucceeds(getDoc(doc(adminDb, 'salary_advances', 'staff-advance')));
 
-  // Audit events are admin-created/admin-readable and immutable afterwards.
-  const auditEvent = {
+  // Legacy payroll audit events remain admin-created/admin-readable and immutable.
+  const payrollAuditEvent = {
     actorUid: 'admin-test',
     actorRole: 'ADMIN',
     action: 'ADVANCE_APPROVED',
@@ -178,12 +178,47 @@ try {
     occurredAt: 2,
     createdAt: 2,
   };
-  await assertFails(setDoc(doc(staffADb, 'payroll_audit_events', 'audit-staff-denied'), auditEvent));
-  await assertSucceeds(setDoc(doc(adminDb, 'payroll_audit_events', 'audit-approved'), auditEvent));
+  await assertFails(setDoc(doc(staffADb, 'payroll_audit_events', 'audit-staff-denied'), payrollAuditEvent));
+  await assertSucceeds(setDoc(doc(adminDb, 'payroll_audit_events', 'audit-approved'), payrollAuditEvent));
   await assertSucceeds(getDoc(doc(adminDb, 'payroll_audit_events', 'audit-approved')));
   await assertFails(getDoc(doc(staffADb, 'payroll_audit_events', 'audit-approved')));
   await assertFails(updateDoc(doc(adminDb, 'payroll_audit_events', 'audit-approved'), { createdAt: 3 }));
   await assertFails(deleteDoc(doc(adminDb, 'payroll_audit_events', 'audit-approved')));
+
+  // Unified audit events are actor-bound, admin-readable, and append-only.
+  const unifiedAuditEvent = {
+    farmId: 'nipponfarm-main',
+    actorUid: 'staff-a',
+    actorRoleSnapshot: 'STAFF',
+    action: 'SOW_REMOVED',
+    targetDomain: 'BREEDING',
+    targetCollection: 'sows',
+    targetId: 'sow-1',
+    previous: { status: 'RECOVERY' },
+    next: { status: 'CULLED' },
+    reason: 'health removal',
+    source: 'UI',
+    occurredAt: 3,
+    schemaVersion: 1,
+  };
+  await assertSucceeds(setDoc(doc(staffADb, 'audit_events', 'unified-staff'), unifiedAuditEvent));
+  await assertFails(setDoc(doc(staffADb, 'audit_events', 'unified-spoof-actor'), {
+    ...unifiedAuditEvent,
+    actorUid: 'staff-b',
+  }));
+  await assertFails(setDoc(doc(staffADb, 'audit_events', 'unified-spoof-role'), {
+    ...unifiedAuditEvent,
+    actorRoleSnapshot: 'ADMIN',
+  }));
+  await assertFails(setDoc(doc(pendingDb, 'audit_events', 'unified-pending'), {
+    ...unifiedAuditEvent,
+    actorUid: 'pending-test',
+    actorRoleSnapshot: 'PENDING',
+  }));
+  await assertSucceeds(getDoc(doc(adminDb, 'audit_events', 'unified-staff')));
+  await assertFails(getDoc(doc(staffADb, 'audit_events', 'unified-staff')));
+  await assertFails(updateDoc(doc(adminDb, 'audit_events', 'unified-staff'), { reason: 'tampered' }));
+  await assertFails(deleteDoc(doc(adminDb, 'audit_events', 'unified-staff')));
 
   // Owner can cancel own pending request, but not an approved one.
   await assertSucceeds(setDoc(doc(staffADb, 'salary_advances', 'cancel-pending'), {
@@ -195,7 +230,7 @@ try {
 
   await assertSucceeds(getDoc(doc(staffADb, 'bills', 'bill-a')));
 
-  console.log('Firestore emulator authorization, user privilege, and payroll audit checks passed.');
+  console.log('Firestore emulator authorization, user privilege, payroll audit, and unified audit checks passed.');
 } finally {
   await testEnv.cleanup();
 }
