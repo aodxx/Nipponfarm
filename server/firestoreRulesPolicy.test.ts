@@ -45,3 +45,49 @@ test('payroll salary and slip owner reads require an active account', () => {
   expectRule("allow read: if isAdmin() || (isActiveUser() && documentId == request.auth.uid);");
   expectRule("allow read: if isAdmin() || (isActiveUser() && resource.data.userId == request.auth.uid);");
 });
+
+test('new user profiles cannot self-assign privileged roles', () => {
+  expectRule("function canCreateOwnUser(userId)");
+  expectRule("request.auth.uid == userId");
+  expectRule("incoming().uid == request.auth.uid");
+  expectRule("(incoming().role == 'PENDING' || isAdmin())");
+  expectRule("allow create: if canCreateOwnUser(userId);");
+});
+
+test('self profile updates cannot change identity, role, or privileged employment fields', () => {
+  expectRule("function canSelfUpdateUser(userId)");
+  expectRule("incoming().uid == existing().uid");
+  expectRule("incoming().email == existing().email");
+  expectRule("incoming().role == existing().role");
+  expectRule("incoming().createdAt == existing().createdAt");
+  expectRule(`
+    incoming().diff(existing()).affectedKeys().hasOnly([
+      'displayName',
+      'phone',
+      'lineId',
+      'address',
+      'emergencyContact',
+      'bankAccount',
+      'photoURL'
+    ])
+  `);
+  expectRule("allow update: if isAdmin() || canSelfUpdateUser(userId);");
+
+  for (const privilegedField of ['role', 'uid', 'email', 'createdAt', 'jobTitle', 'resignationReason']) {
+    assert.equal(
+      normalize(`
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName',
+          'phone',
+          'lineId',
+          'address',
+          'emergencyContact',
+          'bankAccount',
+          'photoURL'
+        ])
+      `).includes(`'${privilegedField}'`),
+      false,
+      `Expected self-update allowlist to exclude ${privilegedField}`,
+    );
+  }
+});

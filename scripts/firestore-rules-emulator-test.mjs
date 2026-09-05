@@ -96,6 +96,47 @@ try {
   const pendingDb = testEnv.authenticatedContext('pending-test').firestore();
   const resignedDb = testEnv.authenticatedContext('resigned-test').firestore();
 
+  // User profile privilege boundaries.
+  const newUserDb = testEnv.authenticatedContext('new-user', { email: 'new@example.com' }).firestore();
+  const newUserProfile = {
+    uid: 'new-user',
+    email: 'new@example.com',
+    displayName: 'New User',
+    role: 'PENDING',
+    createdAt: 1,
+  };
+
+  await assertFails(setDoc(doc(newUserDb, 'users', 'new-user'), {
+    ...newUserProfile,
+    role: 'ADMIN',
+  }));
+  await assertFails(setDoc(doc(newUserDb, 'users', 'new-user'), {
+    ...newUserProfile,
+    uid: 'someone-else',
+  }));
+  await assertFails(setDoc(doc(newUserDb, 'users', 'new-user'), {
+    ...newUserProfile,
+    email: 'spoofed@example.com',
+  }));
+  await assertSucceeds(setDoc(doc(newUserDb, 'users', 'new-user'), newUserProfile));
+  await assertSucceeds(updateDoc(doc(newUserDb, 'users', 'new-user'), {
+    displayName: 'Updated User',
+    phone: '0800000000',
+  }));
+  await assertFails(updateDoc(doc(newUserDb, 'users', 'new-user'), { role: 'ADMIN' }));
+  await assertFails(updateDoc(doc(newUserDb, 'users', 'new-user'), { jobTitle: 'ADMIN OVERRIDE' }));
+  await assertFails(updateDoc(doc(newUserDb, 'users', 'new-user'), { resignationReason: 'self-controlled' }));
+  await assertFails(updateDoc(doc(newUserDb, 'users', 'new-user'), { createdAt: 999 }));
+
+  const ownerDb = testEnv.authenticatedContext('owner-new', { email: 'panaod3826@gmail.com' }).firestore();
+  await assertSucceeds(setDoc(doc(ownerDb, 'users', 'owner-new'), {
+    uid: 'owner-new',
+    email: 'panaod3826@gmail.com',
+    displayName: 'Owner',
+    role: 'ADMIN',
+    createdAt: 1,
+  }));
+
   // Existing-owner boundaries.
   await assertSucceeds(updateDoc(doc(staffADb, 'bills', 'bill-a'), { vendorName: 'QA Vendor A Updated' }));
   await assertSucceeds(updateDoc(doc(staffADb, 'bill_items', 'bill-item-a'), { description: 'QA Item Updated' }));
@@ -154,7 +195,7 @@ try {
 
   await assertSucceeds(getDoc(doc(staffADb, 'bills', 'bill-a')));
 
-  console.log('Firestore emulator authorization and payroll audit checks passed.');
+  console.log('Firestore emulator authorization, user privilege, and payroll audit checks passed.');
 } finally {
   await testEnv.cleanup();
 }
