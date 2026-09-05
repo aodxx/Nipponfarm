@@ -9,7 +9,7 @@
     "vercel-build": "vite build",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist",
-    "test:auth": "tsx --test server/authorizationPolicy.test.ts server/aiErrors.test.ts server/firestoreRulesPolicy.test.ts src/lib/billIdempotency.test.ts src/lib/payrollUtils.test.ts src/lib/payrollAudit.test.ts src/lib/pigSaleIdempotency.test.ts src/lib/cycleEngine.test.ts src/lib/audit.test.ts src/lib/taskEngine.test.ts src/lib/swineAiSafety.test.ts src/services/sowRemovalSafety.test.ts src/services/pigSaleVoidSafety.test.ts",
+    "test:auth": "tsx --test server/authorizationPolicy.test.ts server/aiErrors.test.ts server/firestoreRulesPolicy.test.ts src/lib/billIdempotency.test.ts src/lib/payrollUtils.test.ts src/lib/payrollAudit.test.ts src/lib/pigSaleIdempotency.test.ts src/lib/cycleEngine.test.ts src/lib/audit.test.ts src/lib/taskEngine.test.ts src/lib/swineAiSafety.test.ts src/lib/receiptValidation.test.ts src/services/sowRemovalSafety.test.ts src/services/pigSaleVoidSafety.test.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
