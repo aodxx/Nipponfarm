@@ -1,73 +1,59 @@
 import { useEffect, useMemo, useState } from 'react';
 import { isPast, isToday, parseISO } from 'date-fns';
-import { subscribeToAllPendingTasks, subscribeToSows } from '../services/sowService';
+import { UnifiedWorkItem } from '../lib/taskEngine';
+import { subscribeToUnifiedWorkQueue } from '../services/workQueueService';
 
 export function useTodayDashboardData() {
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [sows, setSows] = useState<any[]>([]);
+  const [workItems, setWorkItems] = useState<UnifiedWorkItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let tasksReady = false;
-    let sowsReady = false;
-    const sync = () => setLoading(!(tasksReady && sowsReady));
-
-    const unsubTasks = subscribeToAllPendingTasks(
+    const unsubscribe = subscribeToUnifiedWorkQueue(
       (items) => {
-        tasksReady = true;
-        setTasks(items);
-        sync();
+        setWorkItems(items);
+        setLoading(false);
       },
       () => {
-        tasksReady = true;
-        setError('โหลดรายการงานไม่สำเร็จ');
-        sync();
+        setError('โหลดคิวงานฟาร์มไม่สำเร็จ');
+        setLoading(false);
       },
     );
 
-    const unsubSows = subscribeToSows(
-      (items) => {
-        sowsReady = true;
-        setSows(items);
-        sync();
-      },
-      () => {
-        sowsReady = true;
-        setError('โหลดข้อมูลแม่พันธุ์ไม่สำเร็จ');
-        sync();
-      },
-    );
-
-    return () => {
-      unsubTasks();
-      unsubSows();
-    };
+    return unsubscribe;
   }, []);
 
   const todayTasks = useMemo(
-    () => tasks.filter((task) => task?.dueDate && isToday(parseISO(task.dueDate))),
-    [tasks],
-  );
-  const overdueTasks = useMemo(
-    () => tasks.filter((task) => task?.dueDate && isPast(parseISO(task.dueDate)) && !isToday(parseISO(task.dueDate))),
-    [tasks],
-  );
-  const urgentTasks = useMemo(
-    () => [...overdueTasks, ...todayTasks].slice(0, 5),
-    [overdueTasks, todayTasks],
-  );
-  const activeSows = useMemo(
-    () => sows.filter((sow) => sow?.type !== 'BOAR' && sow?.status !== 'CULLED'),
-    [sows],
+    () => workItems.filter((item) => item.dueDate && isToday(parseISO(item.dueDate))),
+    [workItems],
   );
 
+  const overdueTasks = useMemo(
+    () => workItems.filter((item) => item.dueDate && isPast(parseISO(item.dueDate)) && !isToday(parseISO(item.dueDate))),
+    [workItems],
+  );
+
+  const exceptionItems = useMemo(
+    () => workItems.filter((item) => item.kind === 'EXCEPTION'),
+    [workItems],
+  );
+
+  const urgentTasks = useMemo(() => {
+    const urgentIds = new Set([
+      ...exceptionItems.map((item) => item.id),
+      ...overdueTasks.map((item) => item.id),
+      ...todayTasks.map((item) => item.id),
+    ]);
+    return workItems.filter((item) => urgentIds.has(item.id)).slice(0, 5);
+  }, [workItems, exceptionItems, overdueTasks, todayTasks]);
+
   return {
-    activeSows,
     error,
+    exceptionItems,
     loading,
     overdueTasks,
     todayTasks,
     urgentTasks,
+    workItems,
   };
 }
