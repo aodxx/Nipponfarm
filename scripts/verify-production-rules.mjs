@@ -57,17 +57,29 @@ async function getRuleset(rulesetName, accessToken) {
   return apiGet(`https://firebaserules.googleapis.com/v1/${rulesetName}`, accessToken);
 }
 
-function findRelease(releases, kind) {
-  if (kind === 'firestore') {
-    return releases.find((release) => release.name?.endsWith('/releases/cloud.firestore')) || null;
+function expectedFirestoreReleaseSuffix(databaseId) {
+  return databaseId === '(default)'
+    ? '/releases/cloud.firestore'
+    : `/releases/cloud.firestore/${databaseId}`;
+}
+
+function findFirestoreRelease(releases, databaseId) {
+  const expectedSuffix = expectedFirestoreReleaseSuffix(databaseId);
+  return releases.find((release) => release.name?.endsWith(expectedSuffix)) || null;
+}
+
+function findStorageRelease(releases, storageBucket) {
+  if (storageBucket) {
+    const expectedSuffix = `/releases/firebase.storage/${storageBucket}`;
+    return releases.find((release) => release.name?.endsWith(expectedSuffix)) || null;
   }
 
-  const storageReleases = releases.filter((release) => release.name?.includes('/releases/firebase.storage'));
+  const storageReleases = releases.filter((release) => release.name?.includes('/releases/firebase.storage/'));
   if (storageReleases.length === 1) return storageReleases[0];
   if (storageReleases.length > 1) {
     throw new Error(
       `Found multiple Firebase Storage releases (${storageReleases.map((item) => item.name).join(', ')}). ` +
-      'Use Firebase Console/CLI to confirm the production bucket before comparison.',
+      'Pass --bucket <bucket-name> or set FIREBASE_STORAGE_BUCKET so the verifier does not guess.',
     );
   }
   return null;
@@ -80,11 +92,12 @@ function chooseRulesFile(ruleset, preferredName) {
     || (files.length === 1 ? files[0] : null);
 }
 
-async function compareRelease({ label, release, preferredName, localPath, accessToken }) {
+async function compareRelease({ label, release, preferredName, localPath, accessToken, expectedRelease }) {
   if (!release?.rulesetName) {
     return {
       label,
       status: 'MISSING_RELEASE',
+      expectedRelease,
       releaseName: release?.name || null,
       rulesetName: release?.rulesetName || null,
     };
@@ -96,6 +109,7 @@ async function compareRelease({ label, release, preferredName, localPath, access
     return {
       label,
       status: 'MISSING_SOURCE_FILE',
+      expectedRelease,
       releaseName: release.name,
       rulesetName: release.rulesetName,
       deployedFileNames: (ruleset.source?.files || []).map((file) => file.name),
@@ -108,6 +122,7 @@ async function compareRelease({ label, release, preferredName, localPath, access
   return {
     label,
     status: local === deployed ? 'MATCH' : 'MISMATCH',
+    expectedRelease,
     releaseName: release.name,
     rulesetName: release.rulesetName,
     deployedFileName: deployedFile.name,
@@ -121,6 +136,9 @@ async function compareRelease({ label, release, preferredName, localPath, access
 
 async function main() {
   const projectId = argValue('--project') || process.env.GOOGLE_CLOUD_PROJECT;
+  const databaseId = argValue('--database') || process.env.FIRESTORE_DATABASE_ID || '(default)';
+  const storageBucket = argValue('--bucket') || process.env.FIREBASE_STORAGE_BUCKET || null;
+
   if (!projectId) {
     throw new Error('Missing project ID. Pass --project <id> or set GOOGLE_CLOUD_PROJECT.');
   }
@@ -128,20 +146,28 @@ async function main() {
   const accessToken = getAccessToken();
   const releases = await listReleases(projectId, accessToken);
 
-  const firestoreRelease = findRelease(releases, 'firestore');
-  const storageRelease = findRelease(releases, 'storage');
+  const firestoreRelease = findFirestoreRelease(releases, databaseId);
+  const storageRelease = findStorageRelease(releases, storageBucket);
+  const expectedFirestoreRelease = databaseId === '(default)'
+    ? `projects/${projectId}/releases/cloud.firestore`
+    : `projects/${projectId}/releases/cloud.firestore/${databaseId}`;
+  const expectedStorageRelease = storageBucket
+    ? `projects/${projectId}/releases/firebase.storage/${storageBucket}`
+    : 'single firebase.storage/<bucket> release in project';
 
   const results = [
     await compareRelease({
-      label: 'Firestore',
+      label: `Firestore (${databaseId})`,
       release: firestoreRelease,
+      expectedRelease: expectedFirestoreRelease,
       preferredName: 'firestore.rules',
       localPath: 'firestore.rules',
       accessToken,
     }),
     await compareRelease({
-      label: 'Storage',
+      label: storageBucket ? `Storage (${storageBucket})` : 'Storage',
       release: storageRelease,
+      expectedRelease: expectedStorageRelease,
       preferredName: 'storage.rules',
       localPath: 'storage.rules',
       accessToken,
@@ -151,6 +177,8 @@ async function main() {
   console.log(JSON.stringify({
     verifiedAt: new Date().toISOString(),
     projectId,
+    databaseId,
+    storageBucket,
     readOnly: true,
     results,
   }, null, 2));
@@ -162,7 +190,7 @@ async function main() {
     return;
   }
 
-  console.log('\nProduction Firestore and Storage rules match repository sources.');
+  console.log('\nProduction Firestore and Storage rules match repository sources for the explicitly selected resources.');
 }
 
 main().catch((error) => {
