@@ -21,10 +21,18 @@ export interface ReceiptValidationSummary {
   tolerance: number;
 }
 
+export type ValidatedReceipt<T extends ReceiptMathInput> = Omit<T, 'items' | 'isCorrect' | 'analysisNote' | 'totalAmount'> & {
+  totalAmount: number;
+  items: Array<ReceiptMathItem & { isLineValid: boolean }>;
+  isCorrect: boolean;
+  analysisNote: string;
+  deterministicValidation: ReceiptValidationSummary;
+};
+
 const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
-export const validateReceiptMath = <T extends ReceiptMathInput>(input: T, tolerance = 0.01): T & { deterministicValidation: ReceiptValidationSummary } => {
+export const validateReceiptMath = <T extends ReceiptMathInput>(input: T, tolerance = 0.01): ValidatedReceipt<T> => {
   const items = Array.isArray(input.items) ? input.items : [];
   let lineMismatchCount = 0;
 
