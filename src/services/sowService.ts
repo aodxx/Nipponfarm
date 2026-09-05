@@ -3,6 +3,7 @@ import { db, auth } from '../lib/firebase';
 import { Sow, SowEvent, Task, EventType } from '../types';
 import { OperationType, handleFirestoreError } from '../lib/firestore-error';
 import { generateTasksForBreed, generateTasksForPregnant, generateTasksForFarrow, generateTasksForRecovery, generateTasksForImmediateBreed, calculateNextSowState } from '../lib/cycleEngine';
+import { applySwineAiSafetyGate } from '../lib/swineAiSafety';
 
 const SOWS_COLLECTION = 'sows';
 const EVENTS_COLLECTION = 'events';
@@ -198,6 +199,10 @@ export const recordEvent = async (sow: Sow, eventType: EventType, date: string, 
       return;
     }
 
+    const safetyDecision = applySwineAiSafetyGate(eventType, details);
+    const safeDetails = safetyDecision.details;
+    const lifecycleActionable = safetyDecision.lifecycleActionable;
+
     const eventRef = draftDocId ? doc(db, EVENTS_COLLECTION, draftDocId) : doc(collection(db, EVENTS_COLLECTION));
     batch.set(eventRef, {
       userId,
@@ -205,29 +210,32 @@ export const recordEvent = async (sow: Sow, eventType: EventType, date: string, 
       type: eventType,
       date,
       parity: sow.parity,
-      details,
+      details: safeDetails,
       videoUrl: videoUrl || null,
       recordedBy: recordedBy || 'Unknown',
       createdAt: now,
     });
 
     let engineEventType: any = eventType;
-    if (eventType === 'ULTRASOUND') {
-      if (details.result === 'POSITIVE') engineEventType = 'ULTRASOUND_POS';
-      else if (details.result === 'NEGATIVE') engineEventType = 'ULTRASOUND_NEG';
-      else if (details.result === 'ABORTION') engineEventType = 'ABORTION';
+    if (lifecycleActionable && eventType === 'ULTRASOUND') {
+      if (safeDetails.result === 'POSITIVE') engineEventType = 'ULTRASOUND_POS';
+      else if (safeDetails.result === 'NEGATIVE') engineEventType = 'ULTRASOUND_NEG';
+      else if (safeDetails.result === 'ABORTION') engineEventType = 'ABORTION';
     }
 
-    const { status: newStatus, parity: newParity } = calculateNextSowState(sow.status, sow.parity, engineEventType);
-
     const sowRef = doc(db, SOWS_COLLECTION, sow.id!);
-    batch.update(sowRef, { status: newStatus, parity: newParity, updatedAt: now });
+    if (lifecycleActionable) {
+      const { status: newStatus, parity: newParity } = calculateNextSowState(sow.status, sow.parity, engineEventType);
+      batch.update(sowRef, { status: newStatus, parity: newParity, updatedAt: now });
+    } else {
+      batch.update(sowRef, { updatedAt: now });
+    }
 
     let taskTypeToComplete = '';
-    if (relatedTaskId) {
+    if (lifecycleActionable && relatedTaskId) {
       const taskRef = doc(db, TASKS_COLLECTION, relatedTaskId);
       batch.update(taskRef, { status: 'COMPLETED' });
-    } else {
+    } else if (lifecycleActionable) {
       if (eventType === 'BREED') taskTypeToComplete = 'BREED';
       if (eventType === 'ULTRASOUND') taskTypeToComplete = 'ULTRASOUND';
       if (eventType === 'FARROW') taskTypeToComplete = 'FARROW';
@@ -245,7 +253,7 @@ export const recordEvent = async (sow: Sow, eventType: EventType, date: string, 
       }
     }
 
-    if (eventType === 'HEAT_RETURN' || (eventType === 'ULTRASOUND' && details.result !== 'POSITIVE')) {
+    if (lifecycleActionable && (eventType === 'HEAT_RETURN' || (eventType === 'ULTRASOUND' && safeDetails.result !== 'POSITIVE'))) {
       const allPendingQ = query(collection(db, TASKS_COLLECTION), where('sowId', '==', sow.id));
       const allPendingSnap = await getDocs(allPendingQ);
       allPendingSnap.docs.forEach(tDoc => {
@@ -257,9 +265,9 @@ export const recordEvent = async (sow: Sow, eventType: EventType, date: string, 
     }
 
     let newTasks: Omit<Task, 'id'>[] = [];
-    if (eventType === 'BREED') {
+    if (lifecycleActionable && eventType === 'BREED') {
       newTasks = generateTasksForBreed(date, sow.id!, sow.sowId, userId);
-    } else if (eventType === 'ULTRASOUND' && details.result === 'POSITIVE') {
+    } else if (lifecycleActionable && eventType === 'ULTRASOUND' && safeDetails.result === 'POSITIVE') {
       const draftTasksQ = query(collection(db, TASKS_COLLECTION), where('sowId', '==', sow.id));
       const draftTasksSnap = await getDocs(draftTasksQ);
       draftTasksSnap.docs.forEach(tDoc => {
@@ -278,11 +286,11 @@ export const recordEvent = async (sow: Sow, eventType: EventType, date: string, 
 
       const breedDate = breedEvents.length > 0 ? breedEvents[0].date : date;
       newTasks = generateTasksForPregnant(breedDate, sow.id!, sow.sowId, userId);
-    } else if (eventType === 'FARROW') {
+    } else if (lifecycleActionable && eventType === 'FARROW') {
       newTasks = generateTasksForFarrow(date, sow.id!, sow.sowId, userId);
-    } else if (eventType === 'WEAN' || (eventType === 'ULTRASOUND' && details.result === 'ABORTION')) {
+    } else if (lifecycleActionable && (eventType === 'WEAN' || (eventType === 'ULTRASOUND' && safeDetails.result === 'ABORTION'))) {
       newTasks = generateTasksForRecovery(date, sow.id!, sow.sowId, userId);
-    } else if (eventType === 'HEAT_RETURN' || (eventType === 'ULTRASOUND' && details.result === 'NEGATIVE')) {
+    } else if (lifecycleActionable && (eventType === 'HEAT_RETURN' || (eventType === 'ULTRASOUND' && safeDetails.result === 'NEGATIVE'))) {
       newTasks = generateTasksForImmediateBreed(date, sow.id!, sow.sowId, userId);
     }
 
