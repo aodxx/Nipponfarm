@@ -1,4 +1,5 @@
 import { authenticatedFetch } from '../lib/authenticatedFetch';
+import { validateReceiptMath, ReceiptValidationSummary } from '../lib/receiptValidation';
 
 export interface ReceiptItem {
   description: string;
@@ -17,10 +18,11 @@ export interface ReceiptAnalysis {
   analysisNote: string;
   isValidBill?: boolean;
   rejectionReason?: string;
+  deterministicValidation?: ReceiptValidationSummary;
 }
 
 export const analyzeReceipt = async (
-  base64Image: string, 
+  base64Image: string,
   historicalContext?: string[],
   historicalVendors?: string[]
 ): Promise<ReceiptAnalysis> => {
@@ -30,14 +32,14 @@ export const analyzeReceipt = async (
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         image: base64Image,
-        historicalDescriptions: historicalContext, // Pass historical product names
-        historicalVendors: historicalVendors // Pass historical vendor names
+        historicalDescriptions: historicalContext,
+        historicalVendors: historicalVendors
       }),
     });
 
-    let responseText = await response.text();
+    const responseText = await response.text();
     if (!response.ok) {
       let errorMessage = "การวิเคราะห์ล้มเหลว";
       try {
@@ -50,8 +52,9 @@ export const analyzeReceipt = async (
     }
 
     try {
-      const result = JSON.parse(responseText);
-      return result as ReceiptAnalysis;
+      const result = JSON.parse(responseText) as ReceiptAnalysis;
+      if (result.isValidBill === false) return result;
+      return validateReceiptMath(result);
     } catch (e) {
       console.error("Failed to parse success response:", responseText);
       if (responseText.includes("<!doctype html>") || responseText.includes("<html")) {
@@ -70,7 +73,7 @@ export const analyzeReceipt = async (
  */
 export const speakText = (text: string) => {
   if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel(); // Stop any current speech
+    window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'th-TH';
     utterance.rate = 1.0;
@@ -83,7 +86,6 @@ export const speakText = (text: string) => {
 let currentAudioSource: AudioBufferSourceNode | null = null;
 let audioContextInstance: AudioContext | null = null;
 
-// Proactively initialize and resume AudioContext on the first real user gesture
 if (typeof window !== 'undefined') {
   const initAudioAndResume = () => {
     try {
@@ -98,7 +100,6 @@ if (typeof window !== 'undefined') {
     } catch (e) {
       console.warn("Could not setup audio context during interaction:", e);
     }
-    // Remove listeners once run once
     window.removeEventListener('click', initAudioAndResume, true);
     window.removeEventListener('touchstart', initAudioAndResume, true);
   };
@@ -112,7 +113,6 @@ if (typeof window !== 'undefined') {
  */
 export const playPCM24kHz = async (base64PCM: string) => {
   try {
-    // 1. Cancel previous playback if still running
     if (currentAudioSource) {
       try {
         currentAudioSource.stop();
@@ -120,7 +120,6 @@ export const playPCM24kHz = async (base64PCM: string) => {
       currentAudioSource = null;
     }
 
-    // Cancel any active Web Speech syntheses so they don't overlap
     if ('speechSynthesis' in window) {
       try {
         window.speechSynthesis.cancel();
@@ -133,15 +132,15 @@ export const playPCM24kHz = async (base64PCM: string) => {
     for (let i = 0; i < len; i++) {
       bytes[i] = binary.charCodeAt(i);
     }
-    
+
     const buffer = bytes.buffer;
     const view = new DataView(buffer);
-    const numSamples = buffer.byteLength / 2; // 16-bit is 2 bytes per sample
-    
+    const numSamples = buffer.byteLength / 2;
+
     if (!audioContextInstance) {
       audioContextInstance = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
     }
-    
+
     if (audioContextInstance.state === 'suspended') {
       try {
         await audioContextInstance.resume();
@@ -150,15 +149,14 @@ export const playPCM24kHz = async (base64PCM: string) => {
       }
     }
 
-    // Create a 24kHz Mono AudioBuffer
     const audioBuffer = audioContextInstance.createBuffer(1, numSamples, 24000);
     const channelData = audioBuffer.getChannelData(0);
-    
+
     for (let i = 0; i < numSamples; i++) {
-      const sample = view.getInt16(i * 2, true); // true = raw little-endian
-      channelData[i] = sample / 32768.0;         // convert to float [-1.0, 1.0]
+      const sample = view.getInt16(i * 2, true);
+      channelData[i] = sample / 32768.0;
     }
-    
+
     const source = audioContextInstance.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(audioContextInstance.destination);
@@ -166,7 +164,7 @@ export const playPCM24kHz = async (base64PCM: string) => {
     currentAudioSource = source;
   } catch (err) {
     console.error("Raw PCM 24kHz playback failure:", err);
-    throw err; // bubble up to trigger SpeechSynthesis fallback if Web Audio actually crashes
+    throw err;
   }
 };
 
