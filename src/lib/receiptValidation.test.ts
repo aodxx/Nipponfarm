@@ -35,6 +35,8 @@ test('rejects empty, unverified, negative and nonfinite inputs', () => {
   assert.equal(validateReceiptMath({ totalAmount: 200, items: [item] }).isCorrect, false);
   assert.equal(validateReceiptMath({ isValidBill: true, totalAmount: -1, items: [item] }).isCorrect, false);
   assert.equal(validateReceiptMath({ isValidBill: true, totalAmount: 200, items: [{ ...item, amount: Infinity }] }).isCorrect, false);
+  assert.equal(validateReceiptMath({ isValidBill: true, totalAmount: 200, items: [{ ...item, amount: undefined as unknown as number }] }).isCorrect, false);
+  assert.equal(validateReceiptMath({ isValidBill: true, totalAmount: 200, items: [{ ...item, quantity: -2 }] }).isCorrect, false);
 });
 
 test('accepts cent rounding and rejects invalid tolerance', () => {
