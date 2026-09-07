@@ -19,6 +19,8 @@ export interface ReceiptValidationSummary {
   expectedTotalFromLines: number;
   totalMatches: boolean;
   tolerance: number;
+  requiresReview: boolean;
+  issues: string[];
 }
 
 export type ValidatedReceipt<T extends ReceiptMathInput> = Omit<T, 'items' | 'isCorrect' | 'analysisNote' | 'totalAmount'> & {
@@ -29,48 +31,47 @@ export type ValidatedReceipt<T extends ReceiptMathInput> = Omit<T, 'items' | 'is
   deterministicValidation: ReceiptValidationSummary;
 };
 
-const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
-const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+const isMoneyNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1_000_000_000;
+const toCents = (value: number): number => Math.round((value + Number.EPSILON) * 100);
+const fromCents = (value: number): number => value / 100;
 
 export const validateReceiptMath = <T extends ReceiptMathInput>(input: T, tolerance = 0.01): ValidatedReceipt<T> => {
+  if (!Number.isFinite(tolerance) || tolerance < 0 || tolerance > 1) {
+    throw new Error('Invalid receipt math tolerance');
+  }
+  const toleranceCents = Math.round(tolerance * 100);
   const items = Array.isArray(input.items) ? input.items : [];
+  const issues: string[] = [];
   let lineMismatchCount = 0;
-
-  const validatedItems = items.map((item) => {
-    const quantity = isFiniteNumber(item.quantity) ? item.quantity : 0;
-    const unitPrice = isFiniteNumber(item.unitPrice) ? item.unitPrice : 0;
-    const amount = isFiniteNumber(item.amount) ? item.amount : 0;
-    const expected = roundMoney(quantity * unitPrice);
-    const actual = roundMoney(amount);
-    const isLineValid = Math.abs(expected - actual) <= tolerance;
-    if (!isLineValid) lineMismatchCount += 1;
-
-    return {
-      ...item,
-      quantity,
-      unitPrice,
-      amount,
-      isLineValid,
-    };
+  let sumCents = 0;
+  const validatedItems = items.map((item, index) => {
+    const valid = isMoneyNumber(item.quantity) && isMoneyNumber(item.unitPrice) && isMoneyNumber(item.amount);
+    const product = valid ? item.quantity * item.unitPrice : NaN;
+    const expected = Number.isFinite(product) && product <= 1_000_000_000 ? toCents(product) : NaN;
+    const actual = valid ? toCents(item.amount) : NaN;
+    const isLineValid = valid && Number.isFinite(expected) && Math.abs(expected - actual) <= toleranceCents;
+    if (!isLineValid) {
+      lineMismatchCount += 1;
+      issues.push(`LINE_${index + 1}_MISMATCH_OR_INVALID`);
+    }
+    if (Number.isFinite(actual)) sumCents += actual;
+    return { ...item, isLineValid };
   });
-
-  const expectedTotalFromLines = roundMoney(validatedItems.reduce((sum, item) => sum + item.amount, 0));
-  const totalAmount = isFiniteNumber(input.totalAmount) ? roundMoney(input.totalAmount) : 0;
-  const totalMatches = Math.abs(expectedTotalFromLines - totalAmount) <= tolerance;
-  const isCorrect = input.isValidBill !== false && lineMismatchCount === 0 && totalMatches;
-
-  const mismatchNotes: string[] = [];
-  if (lineMismatchCount > 0) mismatchNotes.push(`พบ ${lineMismatchCount} รายการที่จำนวน × ราคาต่อหน่วยไม่ตรงกับยอดรายการ`);
-  if (!totalMatches) mismatchNotes.push(`ผลรวมรายการ ${expectedTotalFromLines.toFixed(2)} บาท ไม่ตรงกับยอดรวม ${totalAmount.toFixed(2)} บาท`);
-
+  if (items.length === 0) issues.push('NO_ITEMS');
+  const validTotal = isMoneyNumber(input.totalAmount);
+  if (!validTotal) issues.push('INVALID_TOTAL');
+  const expectedTotalFromLines = fromCents(sumCents);
+  const totalMatches = validTotal && items.length > 0 && Math.abs(sumCents - toCents(input.totalAmount)) <= toleranceCents;
+  if (!totalMatches) issues.push('TOTAL_MISMATCH_OR_INVALID');
+  if (input.isValidBill !== true) issues.push('DOCUMENT_NOT_VERIFIED');
+  const isCorrect = issues.length === 0;
   const baseNote = typeof input.analysisNote === 'string' ? input.analysisNote.trim() : '';
-  const deterministicNote = mismatchNotes.length > 0
-    ? `ตรวจด้วยระบบคำนวณ: ${mismatchNotes.join('; ')}`
-    : 'ตรวจด้วยระบบคำนวณ: ตัวเลขรายการและยอดรวมสอดคล้องกัน';
-
+  const deterministicNote = isCorrect
+    ? 'ตรวจด้วยระบบคำนวณ: ตัวเลขรายการและยอดรวมสอดคล้องกัน (ยังต้องตรวจความถูกต้องของการอ่านภาพ)'
+    : 'ตรวจด้วยระบบคำนวณ: พบข้อมูลไม่ครบหรือยอดไม่ตรง กรุณาตรวจบิลต้นฉบับก่อนบันทึก';
   return {
     ...input,
-    totalAmount,
     items: validatedItems,
     isCorrect,
     analysisNote: [baseNote, deterministicNote].filter(Boolean).join('\n'),
@@ -79,6 +80,8 @@ export const validateReceiptMath = <T extends ReceiptMathInput>(input: T, tolera
       expectedTotalFromLines,
       totalMatches,
       tolerance,
+      requiresReview: !isCorrect,
+      issues,
     },
   };
 };
