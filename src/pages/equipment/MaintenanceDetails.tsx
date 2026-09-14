@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBottomSheet } from '../../contexts/BottomSheetContext';
 import { ArrowLeft, Wrench, CheckCircle, AlertTriangle, User, ArrowRight } from 'lucide-react';
 import { SecureVideoPlayer } from '../../components/SecureVideoPlayer';
 import MaintenanceWorkflowProgress from '../../components/maintenance/MaintenanceWorkflowProgress';
+import { updateMaintenanceStatus } from '../../services/maintenanceService';
 
 interface MaintenanceRequest {
   id: string;
@@ -60,11 +61,12 @@ export default function MaintenanceDetails() {
     if (!id || updating) return;
     setUpdating(true);
     try {
-      await updateDoc(doc(db, 'maintenance_requests', id), {
+      await updateMaintenanceStatus(id, newStatus);
+      setRequest(prev => prev ? {
+        ...prev,
         status: newStatus,
-        updatedAt: Date.now()
-      });
-      setRequest(prev => prev ? { ...prev, status: newStatus } : null);
+        ...(newStatus === 'RESOLVED' ? { resolvedAt: Date.now() } : {}),
+      } : null);
     } catch (error) {
       console.error('Error updating status:', error);
       showAlert('เกิดข้อผิดพลาดในการอัปเดตสถานะ');

@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { handleFirestoreError, OperationType } from '../lib/firestore-error';
+import { assertMaintenanceStatusTransition, getMaintenanceStatusPatch, MaintenanceStatus } from '../lib/maintenanceWorkflow';
 
 export interface MaintenanceRequest {
   id?: string;
@@ -60,11 +61,11 @@ export const createMaintenanceRequest = async (request: Omit<MaintenanceRequest,
 export const updateMaintenanceStatus = async (id: string, status: MaintenanceRequest['status']) => {
   try {
     const docRef = doc(db, COLLECTION_NAME, id);
-    const updateData: any = { status };
-    if (status === 'RESOLVED') {
-      updateData.resolvedAt = Date.now();
-    }
-    await updateDoc(docRef, updateData);
+    const existing = await getDoc(docRef);
+    if (!existing.exists()) throw new Error('Maintenance request not found');
+    const currentStatus = existing.data().status as MaintenanceStatus;
+    assertMaintenanceStatusTransition(currentStatus, status);
+    await updateDoc(docRef, getMaintenanceStatusPatch(status, Date.now()));
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `${COLLECTION_NAME}/${id}`);
   }
