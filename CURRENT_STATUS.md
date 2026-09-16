@@ -22,6 +22,12 @@ Nipponfarm ยังอยู่ใน **controlled production-readiness verific
 - PR #28: dependency remediation แบบ compatibility-first ผ่าน tests, TypeScript และ production build; อัปเดต `react-router-dom` ภายใน major 7, Vite ภายใน major 6 และ override `protobufjs`/`websocket-driver`; generation audit ยืนยัน **critical vulnerabilities = 0**.
 - Standard CI มี authorization/regression tests, TypeScript lint, production build และ standalone startup smoke.
 
+### Dependency Inventory Refresh — 17 กันยายน 2026
+
+รัน `npm audit`, `npm audit --omit=dev`, `npm outdated` และ `npm explain` จาก `package-lock.json` ล่าสุด. Full tree มี 25 advisories (14 high, 7 moderate, 4 low); production-oriented tree มี 24 advisories (13 high, 7 moderate, 4 low). `nodemailer` เป็น direct high finding ที่มี patch ในสาย 9.x. `xlsx` เป็น direct high finding ที่ npm audit ยังระบุว่าไม่มี safe automatic fix. รายการ transitive high ส่วนใหญ่ผูกกับ Firebase, Vite/PWA toolchain หรือ optional MCP/shadcn tree และต้องแก้แบบ parent-first.
+
+รายงานฉบับเต็มอยู่ที่ `docs/DEPENDENCY_INVENTORY_2026-09-17.md`. รอบนี้เป็น inventory เท่านั้น ยังไม่มีการเปลี่ยน package manifest หรือ lockfile.
+
 ## สิ่งที่ยังต้องพิสูจน์หรือทำต่อ
 
 ### External / production access
