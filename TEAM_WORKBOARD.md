@@ -26,7 +26,8 @@
 | P1 | Dependency vulnerabilities | `READY` | npm audit baseline | compatibility-first remediation; no force upgrade |
 | P1 | Storage legacy path migration | `READY` | `news`/`maintenance` ยัง broad | เปลี่ยน client path ให้ owner/role scoped ก่อน tighten rules |
 | P1 | Firestore `farmId` / permission matrix | `DESIGN_READY` | active-user collections ยัง broad | ออกแบบ tenant boundary ก่อนรองรับหลายฟาร์ม |
-| P1 | LINE OA + LIFF integration architecture | `PLANNED` | `docs/LINE_INTEGRATION_PLAN.md` | ตรวจ Auth/user/role/routes ต่อ แล้วค่อย implement additive integration |
+| P1 | LINE OA + LIFF integration architecture | `DESIGN_READY` | `docs/LINE_INTEGRATION_PLAN.md` | architecture baseline พร้อม |
+| P1 | LINE account-linking auth boundary | `DESIGN_READY` | `docs/LINE_AUTH_BOUNDARY_DESIGN.md` | LINE identity เป็น external channel; Firebase UID/role ยังคงเป็น canonical authorization |
 | P2 | Remaining bundle/vendor cleanup | `READY` | main ~2.02 MB | lottie/vendor cleanup หลัง P1 |
 | P2 | Live AI transport | `READY` | `/live` standalone WS | ออกแบบ SSE/HTTP streaming หรือแยก WS runtime |
 | P2 | PWA/offline acceptance | `EXTERNAL_DEVICE_TEST` | PWA shell มีแล้ว | Android install/offline/update/recovery + pending sync |
@@ -44,6 +45,7 @@
 9. Merge PR #21 payroll permission/audit Emulator verification.
 10. ใช้ Single Controller Execution แทน multi-team queue.
 11. สร้าง `docs/LINE_INTEGRATION_PLAN.md` เป็น design baseline สำหรับ LINE OA + LIFF โดยไม่แก้ core workflow.
+12. สร้าง `docs/LINE_AUTH_BOUNDARY_DESIGN.md` กำหนด canonical Firebase identity, LINE account-linking boundary, webhook security และ non-regression rules.
 
 ## Next order
 
@@ -51,12 +53,11 @@
 2. **Core acceptance: Sow Lifecycle → Pig Sale → Maintenance** ด้วย isolated/test data.
 3. **Storage legacy path migration** (`news`, `maintenance`) ให้ owner/role scoped.
 4. **Firestore farm/tenant permission design** ก่อนเพิ่ม multi-farm capability.
-5. **LINE integration repository audit:** inspect Auth/user/role/routes/Firebase boundaries และกำหนด endpoint/data-link contract ก่อน coding.
-6. **LINE foundation implementation** หลัง design gate ผ่าน: health/config guard → webhook verification → account linking → LIFF entry → Rich Menu → notifications.
-7. **Remaining bundle/vendor cleanup.**
-8. **Live AI transport.**
-9. **PWA/offline acceptance.**
-10. เมื่อ production access พร้อม ให้ทำครั้งเดียวเป็น gate: Firebase backup/inventory → controlled rules deploy → Vercel env/Gemini → runtime logs → production smoke.
+5. **LINE foundation implementation** หลัง design gate ผ่าน: health/config guard → webhook verification → account linking → LIFF entry → Rich Menu → notifications.
+6. **Remaining bundle/vendor cleanup.**
+7. **Live AI transport.**
+8. **PWA/offline acceptance.**
+9. เมื่อ production access พร้อม ให้ทำครั้งเดียวเป็น gate: Firebase backup/inventory → controlled rules deploy → Vercel env/Gemini → runtime logs → production smoke.
 
 ## LINE Integration Safety Gate
 
