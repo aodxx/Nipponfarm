@@ -53,9 +53,9 @@ P0 เหล่านี้ให้หยุดเฉพาะรายกา�
 
 ## NEXT TASK
 
-**Dependency Remediation — Inventory First**
+**Dependency Remediation — Batch 2: Firebase runtime chain**
 
-เป้าหมายรอบถัดไปคือสร้าง evidence ว่า critical/high vulnerabilities มาจาก package ใด, เป็น direct หรือ transitive, มี safe patched version หรือไม่ และ upgrade ใดมี breaking risk จากนั้นแก้เฉพาะชุดที่ compatibility พิสูจน์ได้ด้วย CI.
+Batch 1 อัปเกรด `nodemailer` ภายใน major 9 และบันทึก Decision Record สำหรับ `xlsx` แล้ว. หลัง merge และตรวจผล ให้พิจารณาอัปเกรด Firebase ภายใน major 12 เพื่อแก้ transitive `@grpc/grpc-js` โดยไม่เปลี่ยน Firebase project, rules หรือข้อมูล production.
 
 ### Definition of Done
 

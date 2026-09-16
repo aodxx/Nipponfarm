@@ -20,6 +20,7 @@ Nipponfarm ยังอยู่ใน **controlled production-readiness verific
 - PR #26: normal CI ใช้ `npm ci --no-audit`; dependency audit ถูกแยกไป workflow เฉพาะ ทำให้ Verify/Firebase Rules เร็วขึ้นโดยไม่ลด test/security coverage.
 - PR #27: Maintenance Storage legacy flat path ถูกจำกัดให้สร้างใหม่ได้เฉพาะ safe image และ object เดิม immutable; owner-scoped `maintenance/<uid>/...` ผ่าน Storage Emulator สำหรับ owner/wrong-owner behavior.
 - PR #28: dependency remediation แบบ compatibility-first ผ่าน tests, TypeScript และ production build; อัปเดต `react-router-dom` ภายใน major 7, Vite ภายใน major 6 และ override `protobufjs`/`websocket-driver`; generation audit ยืนยัน **critical vulnerabilities = 0**.
+- Batch 1: อัปเกรด `nodemailer` จาก `9.0.3` เป็น `9.1.1` ภายใน major เดิม; full audit ลดจาก 25 เป็น 24 advisories และ production-oriented audit ลดจาก 24 เป็น 23. สร้าง `docs/DECISION_RECORD_XLSX_REMEDIATION.md` โดยคง `xlsx` ชั่วคราวพร้อม containment เพราะ npm ยังไม่มี safe automatic fix.
 - Standard CI มี authorization/regression tests, TypeScript lint, production build และ standalone startup smoke.
 
 ## สิ่งที่ยังต้องพิสูจน์หรือทำต่อ
