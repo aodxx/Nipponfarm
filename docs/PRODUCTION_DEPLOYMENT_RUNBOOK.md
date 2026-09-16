@@ -6,14 +6,30 @@
 
 - Repository: `aodxx/Nipponfarm`
 - Branch: `main`
-- Merged change: `ec276f5 fix: secure server integration endpoints` (squashed PR #2)
+- Merged changes: PR #2 `ec276f5 fix: secure server integration endpoints`; PR #4 `ddd4a4b fix: standardize Gemini readiness errors`
 - Production URL: `https://nipponfarm.vercel.app`
 - Hosting: Vercel
 - Build command: `npm run build`
 - Output directory: `dist`
 - Cron: `/api/cron/daily-tasks`, schedule `0 22 * * *` UTC / 05:00 Asia/Bangkok
 
-การ merge สำเร็จแล้ว แต่เอกสารฉบับนี้ **ยังไม่ใช่หลักฐานว่า production deployment ผ่าน**. ต้องทำ Preview gate และ Production smoke test ตามลำดับก่อนประกาศใช้งาน.
+การ merge สำเร็จแล้ว และ production URL ตอบด้วย response contract ของ PR4 (`aiStatus: AI_NOT_CONFIGURED`) ณ วันที่ 17 กันยายน 2026. อย่างไรก็ตาม การตรวจนี้ยืนยันเฉพาะ deployment/runtime boundary และยังไม่ใช่หลักฐานว่า Gemini success path หรือ integration อื่นพร้อมใช้งาน.
+
+## Verified post-merge evidence — 17 September 2026
+
+PR #4 ถูก merge เข้า `main` ด้วย merge commit `ddd4a4bd3d26b5480827fada3a401dd1e1b2d111`. GitHub Verify ของ main ผ่าน และ local `main` ตรงกับ `origin/main` ก่อนเริ่มจัดทำเอกสารนี้.
+
+Production smoke requests ที่ไม่แก้ไขข้อมูลให้ผลดังนี้:
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `GET /api/health` | PASS | HTTP 200; `status: ok`, `aiReady: false`, `aiStatus: AI_NOT_CONFIGURED` |
+| Unauthenticated `POST /api/receipt-analyze` | PASS | HTTP 401 `Authentication required` |
+| Unauthenticated `POST /api/text-to-speech` | PASS | HTTP 401 `Authentication required` |
+| GitHub Verify on main | PASS | Latest main workflow checks passed |
+| Gemini success path | NOT RUN | Production `GEMINI_API_KEY` is not configured or not available to this audit |
+
+The production response confirms that PR4 is live, but the system must remain in controlled-deployment status until the required server-side environment variables and authenticated success-path tests are completed.
 
 ## Safety rules
 
@@ -21,7 +37,7 @@
 
 ## Phase 0: Preflight
 
-1. เปิด Vercel project `nipponfarm` และยืนยันว่า Git repository คือ `aodxx/Nipponfarm`, production branch คือ `main` และ deployment ล่าสุดอ้างอิง commit `ec276f5`.
+1. เปิด Vercel project `nipponfarm` และยืนยันว่า Git repository คือ `aodxx/Nipponfarm`, production branch คือ `main` และ deployment ล่าสุดอ้างอิง commit ใน `origin/main` ที่มี PR4 merge commit `ddd4a4b` อยู่ใน ancestry.
 2. บันทึก deployment URL/ID ของ production เดิมเพื่อ rollback ก่อน promote version ใหม่.
 3. ยืนยัน Firebase Authorized Domains มี `nipponfarm.vercel.app` และโดเมน custom ที่ใช้งานจริง โดยไม่เปลี่ยน Firestore หรือ Storage rules.
 4. ตรวจว่า branch `main` clean และ GitHub Actions `Verify` ของ commit merge ผ่าน.
