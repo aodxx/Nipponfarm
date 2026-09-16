@@ -49,5 +49,6 @@
 | Firebase → UI | PASS (read only) | ผู้ใช้ยืนยันข้อมูลเดิมแสดง |
 | Browser → HTTP API | PASS | หน้าเว็บและ `/api/health` ตอบ HTTP 200 จาก production |
 | Unauthenticated → AI APIs | PASS | Receipt, TTS และ Swine AI ตอบ HTTP 401 ทั้งหมด |
+| PR #4 production readiness contract | PASS (17/09/2026) | Production `/api/health` ตอบ `aiReady:false`, `aiStatus:AI_NOT_CONFIGURED`; unauthenticated Receipt/TTS ตอบ HTTP 401 |
 | HTTP API → external services | NOT RUN | Secrets และ logs ยังไม่ยืนยัน |
 | Live WebSocket | BLOCKED | handler ปัจจุบันไม่ได้ export ผ่าน `api/index.ts` |
