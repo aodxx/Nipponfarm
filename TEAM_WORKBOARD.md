@@ -23,7 +23,7 @@
 | P0 | Gemini production readiness | `EXTERNAL_BLOCKED` | baseline `AI_NOT_CONFIGURED` | ต้อง Vercel env/test credential + success-path smoke |
 | P1 | Production rules deployment verification | `EXTERNAL_BLOCKED` | latest rules อยู่ใน repo | ต้อง backup + controlled deploy + rollback + production smoke |
 | P1 | Core workflow acceptance: Sow/Pig Sale/Maintenance | `READY` | workflow matrix | ทำ isolated acceptance โดยไม่เพิ่ม feature |
-| P1 | Dependency vulnerabilities | `READY` | npm audit baseline | compatibility-first remediation; no force upgrade |
+| P1 | Dependency vulnerabilities | `BATCH1_PR_READY` | Nodemailer 9.1.1 + `docs/DECISION_RECORD_XLSX_REMEDIATION.md`; audit 24 full / 23 production-oriented | Review/merge Batch 1; next Batch 2 is Firebase 12.x and `@grpc/grpc-js` chain |
 | P1 | Storage legacy path migration | `READY` | `news`/`maintenance` ยัง broad | เปลี่ยน client path ให้ owner/role scoped ก่อน tighten rules |
 | P1 | Firestore `farmId` / permission matrix | `DESIGN_READY` | active-user collections ยัง broad | ออกแบบ tenant boundary ก่อนรองรับหลายฟาร์ม |
 | P2 | Remaining bundle/vendor cleanup | `READY` | main ~2.02 MB | lottie/vendor cleanup หลัง P1 |
