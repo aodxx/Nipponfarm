@@ -11,7 +11,7 @@
 | P1 | Storage legacy path `news`/`maintenance` ยัง broad | PR #18 tighten `bills/<uid>` แล้ว แต่คง compatibility สำหรับ legacy paths | migrate client path ให้ owner/role scoped แล้ว tighten rules รอบถัดไป |
 | P1 | Firestore farm/tenant boundary ยังไม่ชัด | `sows`, `events`, `tasks`, `pig_sales`, chat/settings ยังใช้ active-user policy | ออกแบบ `farmId`/permission matrix ก่อนรองรับหลายฟาร์มหรือข้อมูลหลายขอบเขต |
 | P1 | Core workflow E2E ยังไม่ครบ | Payroll permission/audit + Receipt idempotency มี automated evidence แต่ Sow/Pig Sale/Maintenance ยังไม่มี full acceptance | ทำ isolated acceptance test ทีละ workflow |
-| P1 | Dependency vulnerabilities | audit baseline ยังมี critical/high issues โดยเฉพาะ dependency path เก่า | remediation compatibility-first; ห้าม force upgrade โดยไม่ regression |
+| P1 | Dependency vulnerabilities | Inventory วันที่ 17/09/2026 พบ 25 advisories: 14 high, 7 moderate, 4 low ใน full tree; production-oriented tree เหลือ 24 รายการ | เริ่มจาก `nodemailer` 9.1.1 และตัดสินใจแก้/แทน `xlsx` ที่ไม่มี safe automatic fix; แยก transitive toolchain เป็น PR ย่อย; ห้าม force upgrade |
 | P1 | Live AI transport ไม่รองรับ Vercel handler ปัจจุบัน | `/live` อยู่ standalone WebSocket; Vercel ใช้ HTTP function | เลือก SSE/HTTP streaming หรือแยก WS runtime พร้อม auth/reconnect tests |
 | P2 | PWA/offline data acceptance ยังขาด | มี PWA shell แต่ยังไม่มี device/offline-data sync evidence | Android device acceptance + pending-sync design |
 | P2 | Remaining bundle/vendor debt | route lazy loading ลด main bundle เหลือ ~2.02 MB แต่ lottie/vendor debt ยังอยู่ | vendor split/removal หลัง P1 reliability |
