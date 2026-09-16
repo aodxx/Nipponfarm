@@ -3,7 +3,7 @@
 กระดานสถานะสำหรับ **Single Controller Execution**
 
 **Controller:** `NIPON-LEAD-01`  
-**Last updated:** 4 September 2026  
+**Last updated:** 17 September 2026  
 **Rule:** ไม่มี Team A / Team B queue; งาน repository ที่ไม่ชนกันเดินได้ทันทีผ่าน branch + PR + automated evidence.
 
 ## Current execution
@@ -26,6 +26,8 @@
 | P1 | Dependency vulnerabilities | `READY` | npm audit baseline | compatibility-first remediation; no force upgrade |
 | P1 | Storage legacy path migration | `READY` | `news`/`maintenance` ยัง broad | เปลี่ยน client path ให้ owner/role scoped ก่อน tighten rules |
 | P1 | Firestore `farmId` / permission matrix | `DESIGN_READY` | active-user collections ยัง broad | ออกแบบ tenant boundary ก่อนรองรับหลายฟาร์ม |
+| P1 | LINE OA + LIFF integration architecture | `DESIGN_READY` | `docs/LINE_INTEGRATION_PLAN.md` | architecture baseline พร้อม |
+| P1 | LINE account-linking auth boundary | `DESIGN_READY` | `docs/LINE_AUTH_BOUNDARY_DESIGN.md` | LINE identity เป็น external channel; Firebase UID/role ยังคงเป็น canonical authorization |
 | P2 | Remaining bundle/vendor cleanup | `READY` | main ~2.02 MB | lottie/vendor cleanup หลัง P1 |
 | P2 | Live AI transport | `READY` | `/live` standalone WS | ออกแบบ SSE/HTTP streaming หรือแยก WS runtime |
 | P2 | PWA/offline acceptance | `EXTERNAL_DEVICE_TEST` | PWA shell มีแล้ว | Android install/offline/update/recovery + pending sync |
@@ -42,6 +44,8 @@
 8. Merge PR #20 payroll regression suites into standard CI; ปิด PR #19 ที่ superseded.
 9. Merge PR #21 payroll permission/audit Emulator verification.
 10. ใช้ Single Controller Execution แทน multi-team queue.
+11. สร้าง `docs/LINE_INTEGRATION_PLAN.md` เป็น design baseline สำหรับ LINE OA + LIFF โดยไม่แก้ core workflow.
+12. สร้าง `docs/LINE_AUTH_BOUNDARY_DESIGN.md` กำหนด canonical Firebase identity, LINE account-linking boundary, webhook security และ non-regression rules.
 
 ## Next order
 
@@ -49,8 +53,23 @@
 2. **Core acceptance: Sow Lifecycle → Pig Sale → Maintenance** ด้วย isolated/test data.
 3. **Storage legacy path migration** (`news`, `maintenance`) ให้ owner/role scoped.
 4. **Firestore farm/tenant permission design** ก่อนเพิ่ม multi-farm capability.
-5. **Remaining bundle/vendor cleanup.**
-6. เมื่อ production access พร้อม ให้ทำครั้งเดียวเป็น gate: Firebase backup/inventory → controlled rules deploy → Vercel env/Gemini → runtime logs → production smoke.
+5. **LINE foundation implementation** หลัง design gate ผ่าน: health/config guard → webhook verification → account linking → LIFF entry → Rich Menu → notifications.
+6. **Remaining bundle/vendor cleanup.**
+7. **Live AI transport.**
+8. **PWA/offline acceptance.**
+9. เมื่อ production access พร้อม ให้ทำครั้งเดียวเป็น gate: Firebase backup/inventory → controlled rules deploy → Vercel env/Gemini → runtime logs → production smoke.
+
+## LINE Integration Safety Gate
+
+- ไม่เปลี่ยน Firebase project เพราะ LINE integration โดยอัตโนมัติ
+- ไม่แก้/ลบข้อมูล production
+- ไม่เปลี่ยน existing authorization rules เพียงเพื่อให้ LINE ใช้งานได้
+- LINE identity ต้องไม่แทน Nipponfarm authorization
+- secrets ต้อง server-only
+- webhook ต้องตรวจ signature และรองรับ duplicate events
+- Finance/private data ต้องเปิดผ่าน authenticated LIFF/Web App เท่านั้น
+- ทุก integration change ต้องผ่าน lint/build/regression tests และ PR gate
+- LINE ต้องสามารถปิด/rollback ได้โดยไม่ทำให้ Nipponfarm Web App หลักหยุดทำงาน
 
 ## External blocker rule
 
